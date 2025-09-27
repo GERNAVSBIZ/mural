@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mural Eletrônico de Comunicados</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Paleta de Cores inspirada em navbrasil.gov.br */
+        :root {
+            --cor-primaria: #003366; /* Azul Escuro */
+            --cor-secundaria: #00a89d; /* Verde-água */
+            --cor-fundo: #f0f4f8;
+            --cor-texto: #333333;
+            --cor-branco: #ffffff;
+        }
+
+        body {
+            background-color: var(--cor-fundo);
+            font-family: 'Inter', sans-serif;
+            color: var(--cor-texto);
+            overflow: hidden; /* Evita barras de rolagem */
+        }
+
+        .header {
+            background-color: var(--cor-primaria);
+            color: var(--cor-branco);
+        }
+
+        .slide-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+        }
+        
+        .slide-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            height: 80%;
+            align-items: center;
+        }
+
+        .slide.active {
+            opacity: 1;
+        }
+
+        .slide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .slide-text-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+            background-color: var(--cor-branco);
+            padding: 2.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .slide-text-content h2 {
+            color: var(--cor-primaria);
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            border-left: 5px solid var(--cor-secundaria);
+            padding-left: 1rem;
+        }
+
+        .slide-text-content p {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            white-space: pre-wrap; /* Mantém a formatação do texto */
+        }
+        
+        /* Layout responsivo */
+        @media (min-width: 768px) {
+            .slide-content.has-image {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        #loading-message, #empty-message {
+            color: var(--cor-primaria);
+            font-size: 1.5rem;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="flex flex-col h-screen">
+
+    <header class="header shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Mural de Comunicados</h1>
+        <div id="clock" class="text-xl"></div>
+    </header>
+
+    <main id="carousel-container" class="flex-grow flex items-center justify-center p-4 md:p-8">
+        <div id="loading-message">Carregando comunicados...</div>
+        <div id="empty-message" class="hidden text-center">
+            <h2 class="text-3xl font-bold">Nenhum comunicado no momento.</h2>
+            <p class="text-xl mt-2">Adicione novos avisos no painel de administração.</p>
+        </div>
+    </main>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURAÇÃO DO FIREBASE ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "...", authDomain: "...", projectId: "..." };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- LÓGICA DO CARROSSEL ---
+        const carouselContainer = document.getElementById('carousel-container');
+        const loadingMessage = document.getElementById('loading-message');
+        const emptyMessage = document.getElementById('empty-message');
+        let slides = [];
+        let currentSlideIndex = 0;
+        let slideInterval;
+
+        function renderSlides(comunicados) {
+            carouselContainer.innerHTML = ''; // Limpa o container
+            slides = [];
+
+            if (comunicados.length === 0) {
+                loadingMessage.classList.add('hidden');
+                emptyMessage.classList.remove('hidden');
+                return;
+            }
+            
+            loadingMessage.classList.add('hidden');
+            emptyMessage.classList.add('hidden');
+
+            comunicados.forEach((comunicado, index) => {
+                const slide = document.createElement('div');
+                slide.className = 'slide';
+                if (index === 0) slide.classList.add('active');
+
+                const hasImage = comunicado.imageUrl && comunicado.imageUrl.trim() !== '';
+                
+                const slideContent = document.createElement('div');
+                slideContent.className = 'slide-content' + (hasImage ? ' has-image' : '');
+
+                let contentHTML = `
+                    <div class="slide-text-content">
+                        <h2>${comunicado.titulo}</h2>
+                        <p>${comunicado.texto}</p>
+                    </div>
+                `;
+
+                if (hasImage) {
+                    contentHTML += `
+                        <div class="flex items-center justify-center h-full">
+                           <img src="${comunicado.imageUrl}" alt="Imagem do comunicado" class="slide-image" onerror="this.style.display='none'">
+                        </div>
+                    `;
+                } else {
+                    // Centraliza o texto se não houver imagem
+                     slideContent.style.gridTemplateColumns = '1fr';
+                }
+
+                slideContent.innerHTML = contentHTML;
+                slide.appendChild(slideContent);
+                carouselContainer.appendChild(slide);
+                slides.push(slide);
+            });
+            
+            startCarousel(comunicados);
+        }
+
+        function showNextSlide(comunicados) {
+            if (slides.length === 0) return;
+            slides[currentSlideIndex].classList.remove('active');
+            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+            slides[currentSlideIndex].classList.add('active');
+            
+            const currentComunicado = comunicados[currentSlideIndex];
+            const duration = (parseInt(currentComunicado.duracao, 10) || 10) * 1000;
+            
+            clearInterval(slideInterval);
+            slideInterval = setInterval(() => showNextSlide(comunicados), duration);
+        }
+
+        function startCarousel(comunicados) {
+            if (slideInterval) clearInterval(slideInterval);
+            if (comunicados.length > 1) {
+                 const firstDuration = (parseInt(comunicados[0].duracao, 10) || 10) * 1000;
+                 slideInterval = setInterval(() => showNextSlide(comunicados), firstDuration);
+            }
+        }
+        
+        // --- BUSCA DE DADOS ---
+        const comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+        const q = query(comunicadosCollection);
+
+        onSnapshot(q, (snapshot) => {
+            const comunicados = [];
+            snapshot.forEach(doc => {
+                comunicados.push({ id: doc.id, ...doc.data() });
+            });
+            renderSlides(comunicados);
+        }, (error) => {
+            console.error("Erro ao buscar comunicados: ", error);
+            carouselContainer.innerHTML = '<div class="text-red-500">Erro ao carregar os comunicados.</div>';
+        });
+
+        // --- RELÓGIO ---
+        const clockElement = document.getElementById('clock');
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const dateString = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            clockElement.textContent = `${dateString} ${timeString}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+    </script>
+</body>
+</html>
