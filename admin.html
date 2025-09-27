@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração do Mural</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --cor-primaria: #003366;
+            --cor-secundaria: #00a89d;
+            --cor-fundo: #f0f4f8;
+            --cor-texto: #333333;
+            --cor-branco: #ffffff;
+            --cor-erro: #e53e3e;
+        }
+
+        body {
+            background-color: var(--cor-fundo);
+            font-family: 'Inter', sans-serif;
+            color: var(--cor-texto);
+        }
+
+        .header { background-color: var(--cor-primaria); color: var(--cor-branco); }
+        .btn-primary { background-color: var(--cor-primaria); color: var(--cor-branco); }
+        .btn-primary:hover { background-color: #004488; }
+        .btn-danger { background-color: var(--cor-erro); color: var(--cor-branco); }
+        .btn-danger:hover { background-color: #c53030; }
+        
+        input, textarea {
+            border: 1px solid #cbd5e0;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--cor-primaria);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen">
+
+    <header class="header shadow-md p-4">
+        <h1 class="text-2xl font-bold text-center">Painel de Administração do Mural</h1>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Seção de Adicionar Comunicado -->
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
+            <form id="add-comunicado-form" class="space-y-4">
+                <div>
+                    <label for="titulo" class="block text-sm font-medium">Título</label>
+                    <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                    <textarea id="texto" rows="5" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></textarea>
+                </div>
+                <div>
+                    <label for="imageUrl" class="block text-sm font-medium">URL da Imagem (Opcional)</label>
+                    <input type="url" id="imageUrl" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm" placeholder="https://exemplo.com/imagem.png">
+                </div>
+                <div>
+                    <label for="duracao" class="block text-sm font-medium">Duração (em segundos)</label>
+                    <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm">
+                </div>
+                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full transition-transform transform hover:scale-105">
+                    Adicionar Comunicado
+                </button>
+            </form>
+            <div id="form-message" class="mt-4 text-center"></div>
+        </section>
+
+        <!-- Seção de Comunicados Atuais -->
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
+            <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                <p id="loading-list">Carregando lista...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- CONFIGURAÇÃO DO FIREBASE ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "...", authDomain: "...", projectId: "..." };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let comunicadosCollection;
+        
+        // --- AUTENTICAÇÃO E INICIALIZAÇÃO ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                console.log("Usuário autenticado:", user.uid);
+                comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+                loadComunicados();
+            } else {
+                console.log("Nenhum usuário. Tentando autenticar...");
+                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    signInAnonymously(auth);
+                }
+            }
+        });
+
+        // --- MANIPULAÇÃO DO FORMULÁRIO ---
+        const form = document.getElementById('add-comunicado-form');
+        const formMessage = document.getElementById('form-message');
+        const submitButton = document.getElementById('submit-button');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const titulo = form.titulo.value.trim();
+            const texto = form.texto.value.trim();
+            const imageUrl = form.imageUrl.value.trim();
+            const duracao = form.duracao.value;
+
+            if (!titulo || !texto) {
+                showMessage('Título e texto são obrigatórios.', 'error');
+                return;
+            }
+            
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adicionando...';
+
+            try {
+                await addDoc(comunicadosCollection, {
+                    titulo,
+                    texto,
+                    imageUrl,
+                    duracao,
+                    createdAt: new Date()
+                });
+                showMessage('Comunicado adicionado com sucesso!', 'success');
+                form.reset();
+                form.duracao.value = 10;
+            } catch (error) {
+                console.error("Erro ao adicionar documento: ", error);
+                showMessage('Erro ao adicionar comunicado.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Adicionar Comunicado';
+            }
+        });
+        
+        function showMessage(msg, type = 'success') {
+            formMessage.textContent = msg;
+            formMessage.className = `mt-4 text-center ${type === 'success' ? 'text-green-600' : 'text-[var(--cor-erro)]'}`;
+            setTimeout(() => formMessage.textContent = '', 3000);
+        }
+
+        // --- LISTAGEM E EXCLUSÃO DE COMUNICADOS ---
+        const listContainer = document.getElementById('comunicados-list');
+        
+        function loadComunicados() {
+            const q = query(comunicadosCollection);
+            onSnapshot(q, (snapshot) => {
+                if (snapshot.empty) {
+                    listContainer.innerHTML = '<p>Nenhum comunicado cadastrado.</p>';
+                    return;
+                }
+                
+                listContainer.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const div = document.createElement('div');
+                    div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
+                    div.innerHTML = `
+                        <div>
+                            <h3 class="font-bold">${data.titulo}</h3>
+                            <p class="text-sm text-gray-600">${data.texto.substring(0, 50)}...</p>
+                            <span class="text-xs text-gray-400">Duração: ${data.duracao}s</span>
+                        </div>
+                        <button data-id="${doc.id}" class="delete-btn btn-danger text-sm py-1 px-3 rounded-md transition-transform transform hover:scale-105">Excluir</button>
+                    `;
+                    listContainer.appendChild(div);
+                });
+
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const id = e.target.dataset.id;
+                        if (confirm('Tem certeza que deseja excluir este comunicado?')) {
+                            try {
+                                await deleteDoc(doc(db, `artifacts/${appId}/public/data/comunicados`, id));
+                                console.log("Comunicado excluído!");
+                            } catch (error) {
+                                console.error("Erro ao excluir: ", error);
+                                alert("Ocorreu um erro ao excluir.");
+                            }
+                        }
+                    });
+                });
+            });
+        }
+    </script>
+</body>
+</html>
