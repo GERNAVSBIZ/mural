@@ -6,33 +6,23 @@
     <title>Mural Eletrônico de Comunicados</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Paleta de Cores inspirada em navbrasil.gov.br */
         :root {
             --cor-primaria: #003366; /* Azul Escuro */
             --cor-secundaria: #00a89d; /* Verde-água */
             --cor-fundo: #f0f4f8;
             --cor-texto: #333333;
             --cor-branco: #ffffff;
+            --cor-erro: #e53e3e;
         }
 
         body {
             background-color: var(--cor-fundo);
             font-family: 'Inter', sans-serif;
             color: var(--cor-texto);
-            overflow: hidden; /* Evita barras de rolagem */
-        }
-
-        .header {
-            background-color: var(--cor-primaria);
-            color: var(--cor-branco);
-        }
-
-        .slide-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
         }
+
+        .header { background-color: var(--cor-primaria); color: var(--cor-branco); }
 
         .slide {
             position: absolute;
@@ -45,10 +35,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
             padding: 2rem;
         }
         
+        .slide.active { opacity: 1; }
+
         .slide-content {
             display: grid;
             grid-template-columns: 1fr;
@@ -57,10 +48,6 @@
             max-width: 1200px;
             height: 80%;
             align-items: center;
-        }
-
-        .slide.active {
-            opacity: 1;
         }
 
         .slide-image {
@@ -91,23 +78,13 @@
             padding-left: 1rem;
         }
 
-        .slide-text-content p {
-            font-size: 1.5rem;
-            line-height: 1.6;
-            white-space: pre-wrap; /* Mantém a formatação do texto */
-        }
+        .slide-text-content p { font-size: 1.5rem; line-height: 1.6; white-space: pre-wrap; }
         
-        /* Layout responsivo */
         @media (min-width: 768px) {
-            .slide-content.has-image {
-                grid-template-columns: 1fr 1fr;
-            }
+            .slide-content.has-image { grid-template-columns: 1fr 1fr; }
         }
         
-        #loading-message, #empty-message {
-            color: var(--cor-primaria);
-            font-size: 1.5rem;
-        }
+        #loading-message, #empty-message, #error-message { color: var(--cor-primaria); font-size: 1.5rem; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -120,9 +97,10 @@
         <div id="clock" class="text-xl"></div>
     </header>
 
-    <main id="carousel-container" class="flex-grow flex items-center justify-center p-4 md:p-8">
+    <main id="carousel-container" class="flex-grow flex items-center justify-center p-4 md:p-8 relative w-full h-full text-center">
         <div id="loading-message">Carregando comunicados...</div>
-        <div id="empty-message" class="hidden text-center">
+        <div id="error-message" class="hidden text-[var(--cor-erro)]"></div>
+        <div id="empty-message" class="hidden">
             <h2 class="text-3xl font-bold">Nenhum comunicado no momento.</h2>
             <p class="text-xl mt-2">Adicione novos avisos no painel de administração.</p>
         </div>
@@ -132,118 +110,152 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CONFIGURAÇÃO DO FIREBASE ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "...", authDomain: "...", projectId: "..." };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // --- LÓGICA DO CARROSSEL ---
         const carouselContainer = document.getElementById('carousel-container');
         const loadingMessage = document.getElementById('loading-message');
         const emptyMessage = document.getElementById('empty-message');
-        let slides = [];
-        let currentSlideIndex = 0;
-        let slideInterval;
+        const errorMessage = document.getElementById('error-message');
 
-        function renderSlides(comunicados) {
-            carouselContainer.innerHTML = ''; // Limpa o container
-            slides = [];
-
-            if (comunicados.length === 0) {
-                loadingMessage.classList.add('hidden');
-                emptyMessage.classList.remove('hidden');
-                return;
-            }
-            
+        function showError(message) {
             loadingMessage.classList.add('hidden');
             emptyMessage.classList.add('hidden');
+            carouselContainer.innerHTML = '';
+            errorMessage.classList.remove('hidden');
+            errorMessage.innerHTML = `<strong>Erro na Configuração:</strong><br>${message}`;
+        }
 
-            comunicados.forEach((comunicado, index) => {
-                const slide = document.createElement('div');
-                slide.className = 'slide';
-                if (index === 0) slide.classList.add('active');
+        try {
+            const userFirebaseConfig = {
+                apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
 
-                const hasImage = comunicado.imageUrl && comunicado.imageUrl.trim() !== '';
+				authDomain: "mural-eletronico-nav.firebaseapp.com",
+
+				projectId: "mural-eletronico-nav",
+
+				storageBucket: "mural-eletronico-nav.firebasestorage.app",
+
+				messagingSenderId: "715537886137",
+
+				appId: "1:715537886137:web:f715e8fc9438df82722468",
+
+				measurementId: "G-T2LLX1J94V"
+
+            };
+
+            const firebaseConfig = typeof __firebase_config !== 'undefined' 
+                ? JSON.parse(__firebase_config) 
+                : userFirebaseConfig;
+
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                throw new Error("A configuração do Firebase não foi encontrada. Cole seu objeto firebaseConfig na variável 'userFirebaseConfig'.");
+            }
+            
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            let slides = [];
+            let currentSlideIndex = 0;
+            let slideInterval;
+
+            function renderSlides(comunicados) {
+                carouselContainer.innerHTML = '';
+                slides = [];
+
+                if (comunicados.length === 0) {
+                    loadingMessage.classList.add('hidden');
+                    emptyMessage.classList.remove('hidden');
+                    if (slideInterval) clearInterval(slideInterval); // Para o carrossel se a lista ficar vazia
+                    return;
+                }
                 
-                const slideContent = document.createElement('div');
-                slideContent.className = 'slide-content' + (hasImage ? ' has-image' : '');
+                loadingMessage.classList.add('hidden');
+                emptyMessage.classList.add('hidden');
 
-                let contentHTML = `
-                    <div class="slide-text-content">
-                        <h2>${comunicado.titulo}</h2>
-                        <p>${comunicado.texto}</p>
-                    </div>
-                `;
+                comunicados.forEach((comunicado, index) => {
+                    const slide = document.createElement('div');
+                    slide.className = 'slide';
+                    if (index === 0) slide.classList.add('active');
 
-                if (hasImage) {
-                    contentHTML += `
-                        <div class="flex items-center justify-center h-full">
-                           <img src="${comunicado.imageUrl}" alt="Imagem do comunicado" class="slide-image" onerror="this.style.display='none'">
-                        </div>
-                    `;
-                } else {
-                    // Centraliza o texto se não houver imagem
-                     slideContent.style.gridTemplateColumns = '1fr';
+                    if (comunicado.type === 'iframe') {
+                         slide.innerHTML = `
+                            <div class="flex flex-col w-full h-full max-w-7xl bg-white p-4 rounded-lg shadow-lg">
+                                <h2 class="text-2xl font-bold text-[var(--cor-primaria)] mb-2 pb-2 border-b">${comunicado.titulo}</h2>
+                                <iframe src="${comunicado.url}" class="w-full h-full border-0 rounded" title="${comunicado.titulo}"></iframe>
+                            </div>
+                        `;
+                    } else {
+                        const hasImage = comunicado.imageUrl && comunicado.imageUrl.trim() !== '';
+                        const slideContent = document.createElement('div');
+                        slideContent.className = 'slide-content' + (hasImage ? ' has-image' : '');
+                        let contentHTML = `
+                            <div class="slide-text-content">
+                                <h2>${comunicado.titulo}</h2>
+                                <p>${comunicado.texto}</p>
+                            </div>
+                            ${hasImage ? `
+                            <div class="flex items-center justify-center h-full">
+                               <img src="${comunicado.imageUrl}" alt="Imagem do comunicado" class="slide-image" onerror="this.style.display='none'">
+                            </div>` : ''}
+                        `;
+                        slideContent.innerHTML = contentHTML;
+                        slide.appendChild(slideContent);
+                    }
+                    carouselContainer.appendChild(slide);
+                    slides.push(slide);
+                });
+                
+                startCarousel(comunicados);
+            }
+
+            function showNextSlide(comunicados) {
+                if (slides.length <= 1) return;
+                slides[currentSlideIndex].classList.remove('active');
+                currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+                slides[currentSlideIndex].classList.add('active');
+                
+                const currentComunicado = comunicados[currentSlideIndex];
+                const duration = (parseInt(currentComunicado.duracao, 10) || 10) * 1000;
+                
+                clearInterval(slideInterval);
+                slideInterval = setInterval(() => showNextSlide(comunicados), duration);
+            }
+
+            function startCarousel(comunicados) {
+                if (slideInterval) clearInterval(slideInterval);
+                currentSlideIndex = 0; // Sempre reinicia do primeiro slide
+                 if (slides.length > 0 && slides[0]) {
+                    slides.forEach(s => s.classList.remove('active'));
+                    slides[0].classList.add('active');
                 }
 
-                slideContent.innerHTML = contentHTML;
-                slide.appendChild(slideContent);
-                carouselContainer.appendChild(slide);
-                slides.push(slide);
-            });
-            
-            startCarousel(comunicados);
-        }
-
-        function showNextSlide(comunicados) {
-            if (slides.length === 0) return;
-            slides[currentSlideIndex].classList.remove('active');
-            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-            slides[currentSlideIndex].classList.add('active');
-            
-            const currentComunicado = comunicados[currentSlideIndex];
-            const duration = (parseInt(currentComunicado.duracao, 10) || 10) * 1000;
-            
-            clearInterval(slideInterval);
-            slideInterval = setInterval(() => showNextSlide(comunicados), duration);
-        }
-
-        function startCarousel(comunicados) {
-            if (slideInterval) clearInterval(slideInterval);
-            if (comunicados.length > 1) {
-                 const firstDuration = (parseInt(comunicados[0].duracao, 10) || 10) * 1000;
-                 slideInterval = setInterval(() => showNextSlide(comunicados), firstDuration);
+                if (comunicados.length > 1) {
+                     const firstDuration = (parseInt(comunicados[0].duracao, 10) || 10) * 1000;
+                     slideInterval = setInterval(() => showNextSlide(comunicados), firstDuration);
+                }
             }
-        }
-        
-        // --- BUSCA DE DADOS ---
-        const comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
-        const q = query(comunicadosCollection);
-
-        onSnapshot(q, (snapshot) => {
-            const comunicados = [];
-            snapshot.forEach(doc => {
-                comunicados.push({ id: doc.id, ...doc.data() });
+            
+            const comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+            onSnapshot(query(comunicadosCollection), (snapshot) => {
+                const comunicados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderSlides(comunicados);
+            }, (error) => {
+                console.error("Erro ao buscar comunicados: ", error);
+                showError("Não foi possível carregar os comunicados do banco de dados.");
             });
-            renderSlides(comunicados);
-        }, (error) => {
-            console.error("Erro ao buscar comunicados: ", error);
-            carouselContainer.innerHTML = '<div class="text-red-500">Erro ao carregar os comunicados.</div>';
-        });
 
-        // --- RELÓGIO ---
+        } catch(error) {
+            console.error("Erro de inicialização do Firebase:", error);
+            showError(error.message);
+        }
+
         const clockElement = document.getElementById('clock');
         function updateClock() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            const dateString = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            clockElement.textContent = `${dateString} ${timeString}`;
+            clockElement.textContent = `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
         }
         setInterval(updateClock, 1000);
         updateClock();
-
     </script>
 </body>
 </html>
+
