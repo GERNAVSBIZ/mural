@@ -128,6 +128,10 @@
 
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
             const app = initializeApp(firebaseConfig);
+            
+            // Linha de depuração para verificar o nome do bucket
+            console.log("Tentando usar o bucket de armazenamento:", firebaseConfig.storageBucket);
+
             const db = getFirestore(app);
             const auth = getAuth(app);
             const storage = getStorage(app);
