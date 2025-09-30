@@ -27,7 +27,7 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
         }
-        .progress-bar-bg { background-color: #e0e0de; border-radius: 9999px; }
+        .progress-bar-bg { background-color: #e0e0e0; border-radius: 9999px; }
         .progress-bar-fill { background-color: var(--cor-progresso); border-radius: 9999px; transition: width 0.3s ease-in-out; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,7 +62,11 @@
 
                 <div id="fields-text-image" class="space-y-4">
                     <div>
-                        <label for="imageUpload" class="block text-sm font-medium">Imagem (Obrigatória se "Somente Imagem")</label>
+                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
+                    </div>
+                    <div>
+                        <label for="imageUpload" class="block text-sm font-medium">Imagem (Opcional)</label>
                         <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
                     </div>
                     <div id="upload-progress-container" class="hidden space-y-2">
@@ -70,14 +74,6 @@
                         <div class="progress-bar-bg w-full h-2.5">
                             <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
                         </div>
-                    </div>
-                     <div class="flex items-center">
-                        <input type="checkbox" id="imageOnly" class="h-4 w-4 rounded border-gray-300 text-[var(--cor-primaria)] focus:ring-[var(--cor-primaria)]">
-                        <label for="imageOnly" class="ml-2 block text-sm">Mostrar somente a imagem (sem texto)</label>
-                    </div>
-                    <div id="texto-container">
-                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
-                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
                     </div>
                 </div>
 
@@ -122,7 +118,7 @@
                 apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
                 authDomain: "mural-eletronico-nav.firebaseapp.com",
                 projectId: "mural-eletronico-nav",
-                storageBucket: "bard-frontend.firebasestorage.app",
+                storageBucket: "mural-eletronico-nav.firebasestorage.app", // Corrigido para o nome correto do bucket
                 messagingSenderId: "715537886137",
                 appId: "1:715537886137:web:f715e8fc9438df82722468",
                 measurementId: "G-T2LLX1J94V"
@@ -133,6 +129,9 @@
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
             const app = initializeApp(firebaseConfig);
             
+            // Linha de depuração para verificar o nome do bucket
+            console.log("Tentando usar o bucket de armazenamento:", firebaseConfig.storageBucket);
+
             const db = getFirestore(app);
             const auth = getAuth(app);
             const storage = getStorage(app);
@@ -162,13 +161,6 @@
                 fieldsTextImage.classList.toggle('hidden', typeSelect.value === 'iframe');
                 fieldsIframe.classList.toggle('hidden', typeSelect.value !== 'iframe');
             });
-            
-            const imageOnlyCheckbox = document.getElementById('imageOnly');
-            const textoContainer = document.getElementById('texto-container');
-            imageOnlyCheckbox.addEventListener('change', () => {
-                textoContainer.classList.toggle('hidden', imageOnlyCheckbox.checked);
-            });
-
 
             const form = document.getElementById('add-comunicado-form');
             const submitButton = document.getElementById('submit-button');
@@ -186,14 +178,14 @@
                     titulo: form.titulo.value.trim(),
                     type: form.type.value,
                     duracao: form.duracao.value,
-                    imageOnly: form.imageOnly.checked,
                     createdAt: new Date(),
-                    imageUrl: '' 
+                    imageUrl: '' // Initialize imageUrl
                 };
 
                 const file = form.imageUpload.files[0];
 
                 if (newComunicado.type === 'text_image' && file) {
+                    // Upload file
                     const storageRef = ref(storage, `images/${Date.now()}_${file.name}`);
                     const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -206,13 +198,14 @@
                         }, 
                         (error) => {
                             console.error("Upload failed:", error);
-                            showError("O upload da imagem falhou. Verifique as regras de segurança do Firebase Storage.");
+                            showError("O upload da imagem falhou.");
                             resetFormState();
                         }, 
                         async () => {
+                            // Upload completed successfully, now we can get the download URL
                             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                             newComunicado.imageUrl = downloadURL;
-                            newComunicado.texto = newComunicado.imageOnly ? '' : form.texto.value.trim();
+                            newComunicado.texto = form.texto.value.trim();
                             saveComunicado(newComunicado);
                         }
                     );
@@ -220,11 +213,6 @@
                     newComunicado.url = form.url.value.trim();
                     saveComunicado(newComunicado);
                 } else {
-                    if(newComunicado.imageOnly) {
-                        showError("Para 'Somente Imagem', você precisa selecionar um arquivo de imagem.");
-                        resetFormState();
-                        return;
-                    }
                     newComunicado.texto = form.texto.value.trim();
                     saveComunicado(newComunicado);
                 }
@@ -244,7 +232,6 @@
             function resetFormState() {
                 form.reset();
                 typeSelect.dispatchEvent(new Event('change'));
-                imageOnlyCheckbox.dispatchEvent(new Event('change'));
                 submitButton.disabled = false;
                 submitButton.textContent = 'Adicionar Comunicado';
                 progressContainer.classList.add('hidden');
@@ -261,16 +248,9 @@
                         const data = docSnap.data();
                         const div = document.createElement('div');
                         div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
-                        
-                        let typeLabel = data.type === 'iframe' ? 'Página Web' : 'Texto/Imagem';
-                        if (data.imageOnly) {
-                            typeLabel = 'Somente Imagem';
-                        }
+                        const typeLabel = data.type === 'iframe' ? 'Página Web' : 'Texto/Imagem';
                         
                         let description = data.url ? data.url : (data.texto || '').substring(0, 50) + '...';
-                        if (data.imageOnly) {
-                            description = 'Exibição de imagem em tela cheia.';
-                        }
 
                         div.innerHTML = `
                             <div>
