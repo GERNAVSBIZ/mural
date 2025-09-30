@@ -122,7 +122,7 @@
                 apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
                 authDomain: "mural-eletronico-nav.firebaseapp.com",
                 projectId: "mural-eletronico-nav",
-                storageBucket: "mural-eletronico-nav.firebasestorage.app",
+                storageBucket: "bard-frontend.firebasestorage.app",
                 messagingSenderId: "715537886137",
                 appId: "1:715537886137:web:f715e8fc9438df82722468",
                 measurementId: "G-T2LLX1J94V"
@@ -132,10 +132,7 @@
 
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
             const app = initializeApp(firebaseConfig);
-
-            // IMPRIMINDO O NOME CORRETO DO BUCKET NO CONSOLE
-            console.log("NOME EXATO DO BUCKET PARA USAR NO COMANDO:", firebaseConfig.storageBucket);
-
+            
             const db = getFirestore(app);
             const auth = getAuth(app);
             const storage = getStorage(app);
@@ -209,7 +206,7 @@
                         }, 
                         (error) => {
                             console.error("Upload failed:", error);
-                            showError("O upload da imagem falhou. Verifique se a configuração de CORS foi aplicada no Google Cloud.");
+                            showError("O upload da imagem falhou. Verifique as regras de segurança do Firebase Storage.");
                             resetFormState();
                         }, 
                         async () => {
@@ -278,7 +275,7 @@
                         div.innerHTML = `
                             <div>
                                 <h3 class="font-bold">${data.titulo}</h3>
-                                <p class="text-sm text-gray-600 break-all">${description}</p>
+                                <p class="text-sm text-gray-600 break-all text-justify">${description}</p>
                                 <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full mt-2 inline-block">${typeLabel}</span>
                             </div>
                             <button data-id="${docSnap.id}" class="delete-btn btn-danger text-sm py-1 px-3 rounded-md flex-shrink-0 ml-4">Excluir</button>
