@@ -13,11 +13,13 @@
             --cor-texto: #333333;
             --cor-branco: #ffffff;
             --cor-erro: #e53e3e;
+            --cor-progresso: #2dd4bf;
         }
         body { background-color: var(--cor-fundo); font-family: 'Inter', sans-serif; color: var(--cor-texto); }
         .header { background-color: var(--cor-primaria); color: var(--cor-branco); }
         .btn-primary { background-color: var(--cor-primaria); color: var(--cor-branco); }
         .btn-primary:hover { background-color: #004488; }
+        .btn-primary:disabled { background-color: #667b99; cursor: not-allowed; }
         .btn-danger { background-color: var(--cor-erro); color: var(--cor-branco); }
         .btn-danger:hover { background-color: #c53030; }
         input:focus, textarea:focus, select:focus {
@@ -25,15 +27,21 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
         }
+        .progress-bar-bg { background-color: #e0e0e0; border-radius: 9999px; }
+        .progress-bar-fill { background-color: var(--cor-progresso); border-radius: 9999px; transition: width 0.3s ease-in-out; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen hidden">
 
-    <header class="header shadow-md p-4">
-        <h1 class="text-2xl font-bold text-center">Painel de Administração do Mural</h1>
+    <header class="header shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Painel de Administração do Mural</h1>
+        <div>
+            <span id="unidade-display" class="text-sm bg-gray-700 px-3 py-1 rounded-full"></span>
+            <button id="logout-button" class="ml-4 text-sm font-bold py-2 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white">Sair</button>
+        </div>
     </header>
 
     <div id="error-container" class="hidden container mx-auto p-4 md:px-8">
@@ -52,169 +60,249 @@
                     <label for="type" class="block text-sm font-medium">Tipo de Comunicado</label>
                     <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
                         <option value="text_image" selected>Texto e Imagem</option>
+                        <option value="image_only">Somente Imagem</option>
                         <option value="iframe">Página Web (iframe)</option>
                     </select>
                 </div>
-
                 <div id="fields-text-image" class="space-y-4">
                     <div>
+                        <label for="imageUpload" class="block text-sm font-medium">Imagem</label>
+                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
+                    </div>
+                    <div id="texto-container">
                         <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
                         <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
                     </div>
-                    <div>
-                        <label for="imageUrl" class="block text-sm font-medium">URL da Imagem (Opcional)</label>
-                        <input type="url" id="imageUrl" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://exemplo.com/imagem.png">
-                    </div>
                 </div>
-
                 <div id="fields-iframe" class="hidden space-y-4">
-                    <div>
+                     <div>
                         <label for="url" class="block text-sm font-medium">URL da Página Web</label>
                         <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
                     </div>
                 </div>
-                
+                <div id="upload-progress-container" class="hidden space-y-2">
+                    <label class="block text-sm font-medium">Progresso do Upload</label>
+                    <div class="progress-bar-bg w-full h-2.5">
+                        <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
+                    </div>
+                </div>
                 <div>
                     <label for="duracao" class="block text-sm font-medium">Duração (em segundos)</label>
                     <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
                 </div>
-                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full transition-transform transform hover:scale-105">
-                    Adicionar Comunicado
-                </button>
+                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">Adicionar</button>
             </form>
-            <div id="form-message" class="mt-4 text-center"></div>
         </section>
-
         <section class="bg-white p-6 rounded-lg shadow-lg">
             <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
             <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                <p id="loading-list">Aguardando conexão...</p>
+                <p id="loading-list">Verificando permissões...</p>
             </div>
         </section>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
+        const userFirebaseConfig = {
+            apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
+            authDomain: "mural-eletronico-nav.firebaseapp.com",
+            projectId: "mural-eletronico-nav",
+            storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+            messagingSenderId: "715537886137",
+            appId: "1:715537886137:web:f715e8fc9438df82722468",
+            measurementId: "G-T2LLX1J94V"
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+        
+        let comunicadosCollection;
+        let currentUserUnidadeId = null;
+
         function showError(message) {
-            document.getElementById('error-container').classList.remove('hidden');
-            document.getElementById('error-message').innerHTML = `<strong class="font-bold">Erro:</strong> ${message}`;
+            const errorContainer = document.getElementById('error-container');
+            const errorMessage = document.getElementById('error-message');
+            errorContainer.classList.remove('hidden');
+            errorMessage.innerHTML = `<strong class="font-bold">Erro:</strong> ${message}`;
         }
 
-        try {
-            const userFirebaseConfig = {
-                apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
-                authDomain: "mural-eletronico-nav.firebaseapp.com",
-                projectId: "mural-eletronico-nav",
-                storageBucket: "mural-eletronico-nav.firebasestorage.app",
-                messagingSenderId: "715537886137",
-                appId: "1:715537886137:web:f715e8fc9438df82722468",
-                measurementId: "G-T2LLX1J94V"
-            };
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
-            if (!firebaseConfig || !firebaseConfig.apiKey) throw new Error("Configuração do Firebase não encontrada. Cole seu objeto firebaseConfig na variável 'userFirebaseConfig'.");
+        // Proteção da Página
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Usuário está logado, buscar sua unidade
+                const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles/${user.uid}`);
+                const userProfileSnap = await getDoc(userProfileRef);
 
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
-            const app = initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-            const auth = getAuth(app);
-            let comunicadosCollection;
-
-            onAuthStateChanged(auth, user => {
-                if (user) {
-                    document.getElementById('loading-list').textContent = 'Carregando lista...';
-                    comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+                if (userProfileSnap.exists()) {
+                    currentUserUnidadeId = userProfileSnap.data().unidadeId;
+                    document.getElementById('unidade-display').textContent = `Unidade: ${currentUserUnidadeId}`;
+                    document.body.classList.remove('hidden'); // Mostra a página
+                    
+                    comunicadosCollection = collection(db, `artifacts/${appId}/public/data/unidades/${currentUserUnidadeId}/comunicados`);
                     loadComunicados();
-                }
-            });
-
-            (async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-                    else await signInAnonymously(auth);
-                } catch(authError) {
-                    showError("Falha na autenticação. Verifique sua API Key do Firebase.");
-                }
-            })();
-
-            const typeSelect = document.getElementById('type');
-            const fieldsTextImage = document.getElementById('fields-text-image');
-            const fieldsIframe = document.getElementById('fields-iframe');
-            typeSelect.addEventListener('change', () => {
-                fieldsTextImage.classList.toggle('hidden', typeSelect.value === 'iframe');
-                fieldsIframe.classList.toggle('hidden', typeSelect.value !== 'iframe');
-            });
-
-            const form = document.getElementById('add-comunicado-form');
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!comunicadosCollection) return showError("Não foi possível conectar ao banco de dados.");
-
-                const submitButton = document.getElementById('submit-button');
-                submitButton.disabled = true;
-                submitButton.textContent = 'Adicionando...';
-                
-                const newComunicado = {
-                    titulo: form.titulo.value.trim(),
-                    type: form.type.value,
-                    duracao: form.duracao.value,
-                    createdAt: new Date()
-                };
-
-                if (newComunicado.type === 'iframe') {
-                    newComunicado.url = form.url.value.trim();
                 } else {
-                    newComunicado.texto = form.texto.value.trim();
-                    newComunicado.imageUrl = form.imageUrl.value.trim();
+                    showError("Perfil de usuário não encontrado. Por favor, faça login novamente.");
+                    setTimeout(() => window.location.href = 'login.html', 3000);
                 }
+            } else {
+                // Usuário não está logado, redireciona para login
+                window.location.href = 'login.html';
+            }
+        });
 
-                try {
-                    await addDoc(comunicadosCollection, newComunicado);
-                    form.reset();
-                    typeSelect.dispatchEvent(new Event('change')); // Reseta a visibilidade dos campos
-                } catch (error) {
-                    console.error("Erro ao adicionar:", error);
-                } finally {
-                    submitButton.disabled = false;
-                    submitButton.textContent = 'Adicionar Comunicado';
-                }
-            });
+        document.getElementById('logout-button').addEventListener('click', () => {
+            signOut(auth);
+        });
+        
+        const typeSelect = document.getElementById('type');
+        const fieldsTextImage = document.getElementById('fields-text-image');
+        const fieldsIframe = document.getElementById('fields-iframe');
+        const textoContainer = document.getElementById('texto-container');
 
-            function loadComunicados() {
-                onSnapshot(query(comunicadosCollection), (snapshot) => {
-                    const listContainer = document.getElementById('comunicados-list');
-                    if (snapshot.empty) return listContainer.innerHTML = '<p>Nenhum comunicado cadastrado.</p>';
-                    listContainer.innerHTML = '';
-                    snapshot.forEach(docSnap => {
-                        const data = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
-                        const typeLabel = data.type === 'iframe' ? 'Página Web' : 'Texto/Imagem';
-                        div.innerHTML = `
-                            <div>
-                                <h3 class="font-bold">${data.titulo}</h3>
-                                <p class="text-sm text-gray-600">${data.texto ? data.texto.substring(0, 50) + '...' : data.url}</p>
-                                <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${typeLabel}</span>
-                            </div>
-                            <button data-id="${docSnap.id}" class="delete-btn btn-danger text-sm py-1 px-3 rounded-md">Excluir</button>
-                        `;
-                        listContainer.appendChild(div);
-                    });
+        typeSelect.addEventListener('change', () => {
+            const isIframe = typeSelect.value === 'iframe';
+            const isImageOnly = typeSelect.value === 'image_only';
 
-                    listContainer.querySelectorAll('.delete-btn').forEach(button => {
-                        button.addEventListener('click', async (e) => {
-                            const id = e.target.dataset.id;
-                            await deleteDoc(doc(db, `artifacts/${appId}/public/data/comunicados`, id));
-                        });
-                    });
-                });
+            fieldsTextImage.classList.toggle('hidden', isIframe);
+            fieldsIframe.classList.toggle('hidden', !isIframe);
+            textoContainer.classList.toggle('hidden', isImageOnly || isIframe);
+        });
+        typeSelect.dispatchEvent(new Event('change'));
+
+        const form = document.getElementById('add-comunicado-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!comunicadosCollection) return showError("Coleção de comunicados não inicializada.");
+
+            const submitButton = document.getElementById('submit-button');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Enviando...';
+
+            const file = document.getElementById('imageUpload').files[0];
+            const tipo = typeSelect.value;
+            
+            const newComunicado = {
+                titulo: form.titulo.value.trim(),
+                type: tipo,
+                duracao: form.duracao.value,
+                createdAt: new Date(),
+            };
+
+            const requiresImage = tipo === 'image_only';
+            if (requiresImage && !file) {
+                showError("Para 'Somente Imagem', o upload de um arquivo é obrigatório.");
+                resetFormState();
+                return;
             }
 
-        } catch(error) {
-            console.error("Erro de inicialização:", error);
-            showError(error.message);
+            if (file) {
+                const storageRef = ref(storage, `images/${currentUserUnidadeId}/${Date.now()}_${file.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, file);
+                
+                const progressContainer = document.getElementById('upload-progress-container');
+                const progressBar = document.getElementById('upload-progress-bar');
+                progressContainer.classList.remove('hidden');
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        progressBar.style.width = progress + '%';
+                    },
+                    (error) => {
+                        showError("O upload da imagem falhou.");
+                        resetFormState();
+                    },
+                    async () => {
+                        newComunicado.imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        addSpecificDataAndSave(newComunicado);
+                    }
+                );
+            } else {
+                addSpecificDataAndSave(newComunicado);
+            }
+        });
+
+        function addSpecificDataAndSave(comunicado) {
+            if (comunicado.type === 'text_image') {
+                comunicado.texto = form.texto.value.trim();
+            } else if (comunicado.type === 'iframe') {
+                comunicado.url = form.url.value.trim();
+            }
+            saveComunicado(comunicado);
+        }
+
+        async function saveComunicado(comunicadoData) {
+            try {
+                await addDoc(comunicadosCollection, comunicadoData);
+                resetFormState();
+            } catch (error) {
+                showError("Não foi possível salvar o comunicado.");
+                resetFormState();
+            }
+        }
+        
+        function resetFormState() {
+            const form = document.getElementById('add-comunicado-form');
+            form.reset();
+            typeSelect.dispatchEvent(new Event('change'));
+            const submitButton = document.getElementById('submit-button');
+            submitButton.disabled = false;
+            submitButton.textContent = 'Adicionar Comunicado';
+            document.getElementById('upload-progress-container').classList.add('hidden');
+            document.getElementById('upload-progress-bar').style.width = '0%';
+        }
+
+        function loadComunicados() {
+            document.getElementById('loading-list').textContent = 'Carregando comunicados...';
+            const q = query(comunicadosCollection);
+            onSnapshot(q, (snapshot) => {
+                const listContainer = document.getElementById('comunicados-list');
+                if (snapshot.empty) {
+                    listContainer.innerHTML = '<p>Nenhum comunicado cadastrado para esta unidade.</p>';
+                    return;
+                }
+                listContainer.innerHTML = '';
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const div = document.createElement('div');
+                    div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
+                    
+                    let typeLabel;
+                    switch(data.type) {
+                        case 'iframe': typeLabel = 'Página Web'; break;
+                        case 'image_only': typeLabel = 'Somente Imagem'; break;
+                        default: typeLabel = 'Texto/Imagem';
+                    }
+                    
+                    const description = data.url || (data.texto || '').substring(0, 50) + '...';
+
+                    div.innerHTML = `
+                        <div>
+                            <h3 class="font-bold">${data.titulo}</h3>
+                            <p class="text-sm text-gray-600 break-all">${description}</p>
+                            <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full mt-2 inline-block">${typeLabel}</span>
+                        </div>
+                        <button data-id="${docSnap.id}" class="delete-btn btn-danger text-sm py-1 px-3 rounded-md flex-shrink-0 ml-4">Excluir</button>
+                    `;
+                    listContainer.appendChild(div);
+                });
+
+                listContainer.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const id = e.target.dataset.id;
+                        await deleteDoc(doc(comunicadosCollection, id));
+                    });
+                });
+            });
         }
     </script>
 </body>
