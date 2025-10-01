@@ -14,11 +14,22 @@
         body { background-color: var(--cor-fundo); font-family: 'Inter', sans-serif; }
         .btn-primary { background-color: var(--cor-primaria); }
         .btn-primary:hover { background-color: #004488; }
-        .link-secondary { color: var(--cor-secundaria); }
         input:focus, select:focus {
             border-color: var(--cor-primaria);
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--cor-primaria);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,62 +38,51 @@
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
-    <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
-        <!-- Formulário de Login (inicialmente visível) -->
-        <div id="login-view">
-            <h2 class="text-2xl font-bold text-center text-gray-800">Acessar Painel</h2>
-            <form id="login-form" class="mt-6 space-y-4">
-                <div>
-                    <label for="login-email" class="text-sm font-medium text-gray-700">Email</label>
-                    <input id="login-email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <div>
-                    <label for="login-password" class="text-sm font-medium text-gray-700">Senha</label>
-                    <input id="login-password" type="password" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <button type="submit" class="w-full py-2 text-white transition-colors rounded-md btn-primary">Entrar</button>
-            </form>
-            <p class="mt-4 text-sm text-center text-gray-600">
-                Não tem uma conta? <a href="#" id="show-signup" class="font-medium link-secondary hover:underline">Cadastre-se</a>
-            </p>
-        </div>
+    <div id="loading-screen" class="text-center">
+        <div class="loader mx-auto"></div>
+        <p class="mt-4 text-lg font-medium text-gray-600">Verificando...</p>
+    </div>
 
-        <!-- Formulário de Cadastro (inicialmente oculto) -->
-        <div id="signup-view" class="hidden">
-            <h2 class="text-2xl font-bold text-center text-gray-800">Criar Conta</h2>
-            <form id="signup-form" class="mt-6 space-y-4">
-                <div>
-                    <label for="signup-email" class="text-sm font-medium text-gray-700">Email</label>
-                    <input id="signup-email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <div>
-                    <label for="signup-password" class="text-sm font-medium text-gray-700">Senha</label>
-                    <input id="signup-password" type="password" required minlength="6" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <div>
-                    <label for="unidade" class="text-sm font-medium text-gray-700">Sua Unidade</label>
-                    <select id="unidade" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                        <option value="" disabled selected>Selecione uma unidade</option>
-                        <option value="MATRIZ">MATRIZ</option>
-                        <option value="CINDCTA_I">CINDCTA I</option>
-                        <option value="CINDCTA_II">CINDCTA II</option>
-                        <option value="DTCEA_IZ">DTCEA-IZ</option>
-                        <!-- Adicione outras unidades aqui -->
-                    </select>
-                </div>
-                <button type="submit" class="w-full py-2 text-white transition-colors rounded-md btn-primary">Cadastrar</button>
-            </form>
-            <p class="mt-4 text-sm text-center text-gray-600">
-                Já tem uma conta? <a href="#" id="show-login" class="font-medium link-secondary hover:underline">Faça login</a>
-            </p>
+    <div id="auth-container" class="hidden w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
+        <div>
+            <h2 id="form-title" class="text-2xl font-bold text-center text-[var(--cor-primaria)]">Login</h2>
+            <p id="error-message" class="mt-2 text-sm text-center text-red-600"></p>
         </div>
-        
-        <div id="error-message" class="hidden p-3 text-sm text-center text-red-800 bg-red-100 rounded-md"></div>
+        <form id="auth-form" class="space-y-6">
+            <div id="unidade-field" class="hidden">
+                <label for="unidade" class="block text-sm font-medium text-gray-700">Sua Unidade</label>
+                <select id="unidade" name="unidade" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none">
+                    <option value="" disabled selected>Selecione sua unidade</option>
+                    <option value="unidade_a">Unidade A</option>
+                    <option value="unidade_b">Unidade B</option>
+                    <option value="unidade_c">Unidade C</option>
+                    <!-- Adicione mais unidades conforme necessário -->
+                </select>
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none">
+            </div>
+            <div>
+                <button type="submit" id="submit-button" class="w-full px-4 py-2 text-sm font-medium text-white transition-colors duration-200 transform btn-primary rounded-md focus:outline-none">
+                    Entrar
+                </button>
+            </div>
+        </form>
+        <div class="text-sm text-center">
+            <a href="#" id="toggle-link" class="font-medium text-[var(--cor-secundaria)] hover:text-opacity-80">
+                Não tem uma conta? Cadastre-se
+            </a>
+        </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const userFirebaseConfig = {
@@ -94,92 +94,94 @@
             appId: "1:715537886137:web:f715e8fc9438df82722468",
             measurementId: "G-T2LLX1J94V"
         };
-
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
-
+        
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
 
-        const loginView = document.getElementById('login-view');
-        const signupView = document.getElementById('signup-view');
-        const showSignup = document.getElementById('show-signup');
-        const showLogin = document.getElementById('show-login');
+        const loadingScreen = document.getElementById('loading-screen');
+        const authContainer = document.getElementById('auth-container');
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Se o usuário já está logado, redireciona para o admin
+                window.location.href = 'admin.html';
+            } else {
+                // Se não há usuário, mostra a tela de login/cadastro
+                loadingScreen.classList.add('hidden');
+                authContainer.classList.remove('hidden');
+            }
+        });
+
+        const form = document.getElementById('auth-form');
+        const formTitle = document.getElementById('form-title');
+        const submitButton = document.getElementById('submit-button');
+        const toggleLink = document.getElementById('toggle-link');
+        const unidadeField = document.getElementById('unidade-field');
         const errorMessage = document.getElementById('error-message');
 
-        // Redireciona se já estiver logado
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                window.location.href = 'admin.html';
-            }
+        let isLogin = true;
+
+        toggleLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isLogin = !isLogin;
+            form.reset();
+            errorMessage.textContent = '';
+            
+            formTitle.textContent = isLogin ? 'Login' : 'Cadastro';
+            submitButton.textContent = isLogin ? 'Entrar' : 'Cadastrar';
+            toggleLink.textContent = isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça o login';
+            unidadeField.classList.toggle('hidden', isLogin);
         });
 
-        showSignup.addEventListener('click', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            loginView.classList.add('hidden');
-            signupView.classList.remove('hidden');
-            errorMessage.classList.add('hidden');
-        });
+            const email = form.email.value;
+            const password = form.password.value;
+            const unidadeId = form.unidade.value;
+            errorMessage.textContent = '';
+            submitButton.disabled = true;
 
-        showLogin.addEventListener('click', (e) => {
-            e.preventDefault();
-            signupView.classList.add('hidden');
-            loginView.classList.remove('hidden');
-            errorMessage.classList.add('hidden');
-        });
-        
-        function displayError(message) {
-            errorMessage.textContent = message;
-            errorMessage.classList.remove('hidden');
-        }
-
-        // Processo de Login
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-
-            signInWithEmailAndPassword(auth, email, password)
-                .then(userCredential => {
-                    window.location.href = 'admin.html';
-                })
-                .catch(error => {
-                    displayError('Email ou senha inválidos.');
-                });
-        });
-
-        // Processo de Cadastro
-        document.getElementById('signup-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('signup-email').value;
-            const password = document.getElementById('signup-password').value;
-            const unidadeId = document.getElementById('unidade').value;
-
-            if (!unidadeId) {
-                displayError('Por favor, selecione uma unidade.');
-                return;
-            }
-
-            createUserWithEmailAndPassword(auth, email, password)
-                .then(async (userCredential) => {
-                    const user = userCredential.user;
-                    // Salva o perfil do usuário com a unidade
-                    const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles/${user.uid}`);
-                    await setDoc(userProfileRef, {
-                        email: user.email,
-                        unidadeId: unidadeId
-                    });
-                    window.location.href = 'admin.html';
-                })
-                .catch(error => {
-                    if (error.code === 'auth/email-already-in-use') {
-                        displayError('Este email já está cadastrado.');
-                    } else {
-                        displayError('Ocorreu um erro ao criar a conta.');
+            try {
+                if (isLogin) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    if (!unidadeId) {
+                       throw new Error("Por favor, selecione uma unidade para se cadastrar.");
                     }
-                });
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    const user = userCredential.user;
+                    
+                    // Salva a unidade do usuário em um perfil
+                    const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
+                    await setDoc(userProfileRef, { unidadeId: unidadeId, email: user.email });
+                }
+                // O onAuthStateChanged vai cuidar do redirecionamento
+            } catch (error) {
+                console.error("Erro de autenticação:", error);
+                errorMessage.textContent = getFriendlyErrorMessage(error.code);
+                submitButton.disabled = false;
+            }
         });
+
+        function getFriendlyErrorMessage(code) {
+            switch (code) {
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                    return 'Email ou senha inválidos.';
+                case 'auth/email-already-in-use':
+                    return 'Este email já está cadastrado.';
+                case 'auth/weak-password':
+                    return 'A senha deve ter pelo menos 6 caracteres.';
+                case 'auth/invalid-email':
+                    return 'O formato do email é inválido.';
+                default:
+                    return 'Ocorreu um erro. Tente novamente.';
+            }
+        }
     </script>
 </body>
 </html>
+
