@@ -27,83 +27,110 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
         }
-        .progress-bar-bg { background-color: #e0e0e0; border-radius: 9999px; }
+        .progress-bar-bg { background-color: #e0e0de; border-radius: 9999px; }
         .progress-bar-fill { background-color: var(--cor-progresso); border-radius: 9999px; transition: width 0.3s ease-in-out; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--cor-primaria);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="min-h-screen hidden">
+<body class="min-h-screen">
 
-    <header class="header shadow-md p-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold">Painel de Administração do Mural</h1>
-        <div>
-            <span id="unidade-display" class="text-sm bg-gray-700 px-3 py-1 rounded-full"></span>
-            <button id="logout-button" class="ml-4 text-sm font-bold py-2 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white">Sair</button>
+    <div id="loading-screen" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <div class="loader mx-auto"></div>
+            <p class="mt-4 text-lg font-medium text-gray-600">Verificando acesso...</p>
         </div>
-    </header>
-
-    <div id="error-container" class="hidden container mx-auto p-4 md:px-8">
-        <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative"></div>
     </div>
-    
-    <main class="container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <section class="bg-white p-6 rounded-lg shadow-lg">
-            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
-            <form id="add-comunicado-form" class="space-y-4">
-                <div>
-                    <label for="titulo" class="block text-sm font-medium">Título</label>
-                    <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
-                </div>
-                <div>
-                    <label for="type" class="block text-sm font-medium">Tipo de Comunicado</label>
-                    <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
-                        <option value="text_image" selected>Texto e Imagem</option>
-                        <option value="image_only">Somente Imagem</option>
-                        <option value="iframe">Página Web (iframe)</option>
-                    </select>
-                </div>
-                <div id="fields-text-image" class="space-y-4">
-                    <div>
-                        <label for="imageUpload" class="block text-sm font-medium">Imagem</label>
-                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
-                    </div>
-                    <div id="texto-container">
-                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
-                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
-                    </div>
-                </div>
-                <div id="fields-iframe" class="hidden space-y-4">
-                     <div>
-                        <label for="url" class="block text-sm font-medium">URL da Página Web</label>
-                        <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
-                    </div>
-                </div>
-                <div id="upload-progress-container" class="hidden space-y-2">
-                    <label class="block text-sm font-medium">Progresso do Upload</label>
-                    <div class="progress-bar-bg w-full h-2.5">
-                        <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div>
-                    <label for="duracao" class="block text-sm font-medium">Duração (em segundos)</label>
-                    <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
-                </div>
-                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">Adicionar</button>
-            </form>
-        </section>
-        <section class="bg-white p-6 rounded-lg shadow-lg">
-            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
-            <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                <p id="loading-list">Verificando permissões...</p>
+
+    <div id="app-container" class="hidden">
+        <header class="header shadow-md p-4 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-center">Painel de Administração</h1>
+            <div>
+                <span id="user-info" class="text-sm mr-4 hidden md:inline"></span>
+                <button id="logout-button" class="text-sm font-medium bg-white text-[var(--cor-primaria)] px-3 py-1.5 rounded-md hover:bg-gray-100 transition">Sair</button>
             </div>
-        </section>
-    </main>
+        </header>
+
+        <div id="error-container" class="hidden container mx-auto p-4 md:px-8 mt-4">
+            <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative"></div>
+        </div>
+        
+        <main class="container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <section class="bg-white p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
+                <form id="add-comunicado-form" class="space-y-4">
+                    <div>
+                        <label for="titulo" class="block text-sm font-medium">Título</label>
+                        <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <div>
+                        <label for="type" class="block text-sm font-medium">Tipo de Comunicado</label>
+                        <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                            <option value="text_image" selected>Texto e Imagem</option>
+                            <option value="image_only">Somente Imagem</option>
+                            <option value="iframe">Página Web (iframe)</option>
+                        </select>
+                    </div>
+
+                    <div id="fields-text-image" class="space-y-4">
+                        <div>
+                            <label for="imageUpload" class="block text-sm font-medium">Imagem</label>
+                            <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
+                        </div>
+                        <div id="upload-progress-container" class="hidden space-y-2">
+                            <label class="block text-sm font-medium">Progresso do Upload</label>
+                            <div class="progress-bar-bg w-full h-2.5">
+                                <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div id="texto-container">
+                            <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                            <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="fields-iframe" class="hidden space-y-4">
+                        <div>
+                            <label for="url" class="block text-sm font-medium">URL da Página Web</label>
+                            <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="duracao" class="block text-sm font-medium">Duração (em segundos)</label>
+                        <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full transition-transform transform hover:scale-105">
+                        Adicionar Comunicado
+                    </button>
+                </form>
+            </section>
+
+            <section class="bg-white p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
+                <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    <p id="loading-list">Verificando...</p>
+                </div>
+            </section>
+        </main>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
@@ -111,57 +138,57 @@
             apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
             authDomain: "mural-eletronico-nav.firebaseapp.com",
             projectId: "mural-eletronico-nav",
-            storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+            storageBucket: "mural-eletronico-nav.firebasestorage.app",
             messagingSenderId: "715537886137",
             appId: "1:715537886137:web:f715e8fc9438df82722468",
-            measurementId: "G-T2LLX1J94V"
+            measurementId: "G-T2LLX_J94V"
         };
-
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const storage = getStorage(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+
+        const loadingScreen = document.getElementById('loading-screen');
+        const appContainer = document.getElementById('app-container');
         
         let comunicadosCollection;
-        let currentUserUnidadeId = null;
+        let currentUserUnidadeId;
 
-        function showError(message) {
-            const errorContainer = document.getElementById('error-container');
-            const errorMessage = document.getElementById('error-message');
-            errorContainer.classList.remove('hidden');
-            errorMessage.innerHTML = `<strong class="font-bold">Erro:</strong> ${message}`;
-        }
-
-        // Proteção da Página
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Usuário está logado, buscar sua unidade
-                const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles/${user.uid}`);
+                // Usuário está logado, buscar seu perfil
+                const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
                 const userProfileSnap = await getDoc(userProfileRef);
 
                 if (userProfileSnap.exists()) {
                     currentUserUnidadeId = userProfileSnap.data().unidadeId;
-                    document.getElementById('unidade-display').textContent = `Unidade: ${currentUserUnidadeId}`;
-                    document.body.classList.remove('hidden'); // Mostra a página
-                    
+                    document.getElementById('user-info').textContent = `Unidade: ${currentUserUnidadeId.replace('_', ' ')}`;
                     comunicadosCollection = collection(db, `artifacts/${appId}/public/data/unidades/${currentUserUnidadeId}/comunicados`);
                     loadComunicados();
+                    
+                    // Mostrar a aplicação
+                    loadingScreen.classList.add('hidden');
+                    appContainer.classList.remove('hidden');
                 } else {
-                    showError("Perfil de usuário não encontrado. Por favor, faça login novamente.");
-                    setTimeout(() => window.location.href = 'login.html', 3000);
+                    // Perfil não encontrado, deslogar e redirecionar
+                    await signOut(auth);
                 }
             } else {
-                // Usuário não está logado, redireciona para login
+                // Usuário não está logado, redirecionar para a página de login
                 window.location.href = 'login.html';
             }
         });
 
-        document.getElementById('logout-button').addEventListener('click', () => {
-            signOut(auth);
-        });
+        // Resto do seu código de `admin.html` permanece o mesmo...
+        document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
+        
+        function showError(message) {
+            document.getElementById('error-container').classList.remove('hidden');
+            document.getElementById('error-message').innerHTML = `<strong class="font-bold">Erro:</strong> ${message}`;
+        }
         
         const typeSelect = document.getElementById('type');
         const fieldsTextImage = document.getElementById('fields-text-image');
@@ -169,79 +196,70 @@
         const textoContainer = document.getElementById('texto-container');
 
         typeSelect.addEventListener('change', () => {
-            const isIframe = typeSelect.value === 'iframe';
-            const isImageOnly = typeSelect.value === 'image_only';
-
-            fieldsTextImage.classList.toggle('hidden', isIframe);
-            fieldsIframe.classList.toggle('hidden', !isIframe);
-            textoContainer.classList.toggle('hidden', isImageOnly || isIframe);
+            fieldsIframe.classList.toggle('hidden', typeSelect.value !== 'iframe');
+            fieldsTextImage.classList.toggle('hidden', typeSelect.value === 'iframe');
+            textoContainer.classList.toggle('hidden', typeSelect.value === 'image_only');
         });
-        typeSelect.dispatchEvent(new Event('change'));
 
         const form = document.getElementById('add-comunicado-form');
+        const submitButton = document.getElementById('submit-button');
+        const progressContainer = document.getElementById('upload-progress-container');
+        const progressBar = document.getElementById('upload-progress-bar');
+        
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!comunicadosCollection) return showError("Coleção de comunicados não inicializada.");
+            if (!comunicadosCollection) return showError("Não foi possível conectar ao banco de dados.");
 
-            const submitButton = document.getElementById('submit-button');
             submitButton.disabled = true;
             submitButton.textContent = 'Enviando...';
 
-            const file = document.getElementById('imageUpload').files[0];
-            const tipo = typeSelect.value;
-            
             const newComunicado = {
                 titulo: form.titulo.value.trim(),
-                type: tipo,
-                duracao: form.duracao.value,
+                type: form.type.value,
+                duracao: parseInt(form.duracao.value, 10),
                 createdAt: new Date(),
             };
 
-            const requiresImage = tipo === 'image_only';
-            if (requiresImage && !file) {
-                showError("Para 'Somente Imagem', o upload de um arquivo é obrigatório.");
-                resetFormState();
-                return;
-            }
+            const file = form.imageUpload.files[0];
 
-            if (file) {
-                const storageRef = ref(storage, `images/${currentUserUnidadeId}/${Date.now()}_${file.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, file);
-                
-                const progressContainer = document.getElementById('upload-progress-container');
-                const progressBar = document.getElementById('upload-progress-bar');
-                progressContainer.classList.remove('hidden');
+            if (newComunicado.type === 'text_image' || newComunicado.type === 'image_only') {
+                if (file) {
+                    const storageRef = ref(storage, `images/${currentUserUnidadeId}/${Date.now()}_${file.name}`);
+                    const uploadTask = uploadBytesResumable(storageRef, file);
+                    progressContainer.classList.remove('hidden');
 
-                uploadTask.on('state_changed', 
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        progressBar.style.width = progress + '%';
-                    },
-                    (error) => {
-                        showError("O upload da imagem falhou.");
-                        resetFormState();
-                    },
-                    async () => {
-                        newComunicado.imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                        addSpecificDataAndSave(newComunicado);
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            progressBar.style.width = progress + '%';
+                        }, 
+                        (error) => {
+                            showError("O upload da imagem falhou.");
+                            resetFormState();
+                        }, 
+                        async () => {
+                            newComunicado.imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                            if (newComunicado.type === 'text_image') newComunicado.texto = form.texto.value.trim();
+                            saveComunicado(newComunicado);
+                        }
+                    );
+                } else {
+                    if(newComunicado.type === 'image_only') {
+                         showError("Para 'Somente Imagem', você precisa selecionar um arquivo de imagem.");
+                         resetFormState();
+                         return;
                     }
-                );
-            } else {
-                addSpecificDataAndSave(newComunicado);
+                    newComunicado.texto = form.texto.value.trim();
+                    saveComunicado(newComunicado);
+                }
+            } else if (newComunicado.type === 'iframe') {
+                newComunicado.url = form.url.value.trim();
+                saveComunicado(newComunicado);
             }
         });
 
-        function addSpecificDataAndSave(comunicado) {
-            if (comunicado.type === 'text_image') {
-                comunicado.texto = form.texto.value.trim();
-            } else if (comunicado.type === 'iframe') {
-                comunicado.url = form.url.value.trim();
-            }
-            saveComunicado(comunicado);
-        }
-
         async function saveComunicado(comunicadoData) {
-            try {
+             try {
                 await addDoc(comunicadosCollection, comunicadoData);
                 resetFormState();
             } catch (error) {
@@ -251,25 +269,19 @@
         }
         
         function resetFormState() {
-            const form = document.getElementById('add-comunicado-form');
             form.reset();
             typeSelect.dispatchEvent(new Event('change'));
-            const submitButton = document.getElementById('submit-button');
             submitButton.disabled = false;
             submitButton.textContent = 'Adicionar Comunicado';
-            document.getElementById('upload-progress-container').classList.add('hidden');
-            document.getElementById('upload-progress-bar').style.width = '0%';
+            progressContainer.classList.add('hidden');
+            progressBar.style.width = '0%';
         }
 
         function loadComunicados() {
-            document.getElementById('loading-list').textContent = 'Carregando comunicados...';
-            const q = query(comunicadosCollection);
+            const q = query(comunicadosCollection, orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
                 const listContainer = document.getElementById('comunicados-list');
-                if (snapshot.empty) {
-                    listContainer.innerHTML = '<p>Nenhum comunicado cadastrado para esta unidade.</p>';
-                    return;
-                }
+                if (snapshot.empty) return listContainer.innerHTML = '<p>Nenhum comunicado cadastrado para esta unidade.</p>';
                 listContainer.innerHTML = '';
                 snapshot.forEach(docSnap => {
                     const data = docSnap.data();
@@ -277,13 +289,22 @@
                     div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
                     
                     let typeLabel;
-                    switch(data.type) {
-                        case 'iframe': typeLabel = 'Página Web'; break;
-                        case 'image_only': typeLabel = 'Somente Imagem'; break;
-                        default: typeLabel = 'Texto/Imagem';
-                    }
+                    let description;
                     
-                    const description = data.url || (data.texto || '').substring(0, 50) + '...';
+                    switch(data.type) {
+                        case 'iframe':
+                            typeLabel = 'Página Web';
+                            description = data.url;
+                            break;
+                        case 'image_only':
+                            typeLabel = 'Somente Imagem';
+                            description = 'Exibição de imagem em tela cheia.';
+                            break;
+                        default:
+                            typeLabel = 'Texto/Imagem';
+                            description = (data.texto || '').substring(0, 50) + '...';
+                            break;
+                    }
 
                     div.innerHTML = `
                         <div>
