@@ -159,22 +159,39 @@
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Usuário está logado, buscar seu perfil
-                const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
-                const userProfileSnap = await getDoc(userProfileRef);
+                // Adicionamos uma lógica de retentativa para lidar com a latência de criação do perfil no banco de dados.
+                const attemptToFetchProfile = async (retries = 3, delay = 500) => {
+                    for (let i = 0; i < retries; i++) {
+                        const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
+                        const userProfileSnap = await getDoc(userProfileRef);
+                        if (userProfileSnap.exists()) {
+                            return userProfileSnap; // Perfil encontrado, retorna os dados
+                        }
+                        // Espera um pouco antes de tentar novamente
+                        if (i < retries - 1) {
+                            await new Promise(res => setTimeout(res, delay));
+                        }
+                    }
+                    return null; // Perfil não encontrado após todas as tentativas
+                };
 
-                if (userProfileSnap.exists()) {
+                const userProfileSnap = await attemptToFetchProfile();
+
+                if (userProfileSnap) {
+                    // Perfil foi encontrado com sucesso
                     currentUserUnidadeId = userProfileSnap.data().unidadeId;
                     document.getElementById('user-info').textContent = `Unidade: ${currentUserUnidadeId.replace('_', ' ')}`;
                     comunicadosCollection = collection(db, `artifacts/${appId}/public/data/unidades/${currentUserUnidadeId}/comunicados`);
                     loadComunicados();
                     
-                    // Mostrar a aplicação
                     loadingScreen.classList.add('hidden');
                     appContainer.classList.remove('hidden');
                 } else {
-                    // Perfil não encontrado, deslogar e redirecionar
+                    // Perfil realmente não foi encontrado, mesmo após as tentativas.
+                    // Isso pode indicar um erro no cadastro. Deslogamos o usuário.
+                    console.error("Perfil do usuário não encontrado após várias tentativas. Deslogando.");
                     await signOut(auth);
+                    // O próprio onAuthStateChanged cuidará do redirecionamento para login.html ao detectar o logout.
                 }
             } else {
                 // Usuário não está logado, redirecionar para a página de login
@@ -182,7 +199,6 @@
             }
         });
 
-        // Resto do seu código de `admin.html` permanece o mesmo...
         document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
         
         function showError(message) {
