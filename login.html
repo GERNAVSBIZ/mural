@@ -140,20 +140,33 @@
                 loadingMessage.textContent = 'Verificando perfil...';
                 loadingOverlay.classList.remove('hidden');
 
-                try {
-                    const userProfilePath = `artifacts/${appId}/public/data/user_profiles/${user.uid}`;
-                    console.log("DEBUG: Tentando buscar perfil em:", userProfilePath);
-                    const userProfileRef = doc(db, userProfilePath);
-                    const docSnap = await getDoc(userProfileRef);
+                const attemptToFetchProfile = async (retries = 3, delay = 500) => {
+                    for (let i = 0; i < retries; i++) {
+                        console.log(`DEBUG: Tentativa ${i + 1} de buscar o perfil.`);
+                        const userProfilePath = `artifacts/${appId}/public/data/user_profiles/${user.uid}`;
+                        const userProfileRef = doc(db, userProfilePath);
+                        const docSnap = await getDoc(userProfileRef);
+                        if (docSnap.exists()) {
+                            return docSnap; // Sucesso!
+                        }
+                        if (i < retries - 1) {
+                            await new Promise(res => setTimeout(res, delay));
+                        }
+                    }
+                    return null; // Falhou após todas as tentativas
+                };
 
-                    if (docSnap.exists()) {
+                try {
+                    const docSnap = await attemptToFetchProfile();
+
+                    if (docSnap) {
                         console.log("DEBUG: Perfil encontrado:", docSnap.data());
                         loadingMessage.textContent = 'Acesso verificado. Redirecionando...';
                         window.location.href = 'admin.html';
                     } else {
-                        console.error("DEBUG: ERRO CRÍTICO - Perfil não encontrado no banco de dados.");
+                        console.error("DEBUG: ERRO CRÍTICO - Perfil não encontrado no banco de dados após múltiplas tentativas.");
                         await signOut(auth);
-                        errorMessage.textContent = 'Seu perfil não foi encontrado. Por favor, tente se cadastrar novamente.';
+                        errorMessage.textContent = 'Seu perfil não foi encontrado após o cadastro. Por favor, tente novamente.';
                         errorMessage.classList.remove('hidden');
                         loadingOverlay.classList.add('hidden');
                     }
