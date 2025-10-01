@@ -101,8 +101,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const userFirebaseConfig = {
              apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
@@ -134,11 +134,34 @@
 
         let isLoginMode = true;
 
-        onAuthStateChanged(auth, user => {
+        // **CORREÇÃO APLICADA AQUI**
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                loadingMessage.textContent = 'Acesso verificado. Redirecionando...';
+                loadingMessage.textContent = 'Verificando perfil...';
                 loadingOverlay.classList.remove('hidden');
-                setTimeout(() => window.location.href = 'admin.html', 500);
+
+                try {
+                    const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
+                    const docSnap = await getDoc(userProfileRef);
+
+                    if (docSnap.exists()) {
+                        loadingMessage.textContent = 'Acesso verificado. Redirecionando...';
+                        window.location.href = 'admin.html';
+                    } else {
+                        // Quebra o loop se o perfil não for encontrado, deslogando o usuário.
+                        await signOut(auth);
+                        errorMessage.textContent = 'Seu perfil não foi encontrado. Por favor, tente se cadastrar novamente.';
+                        errorMessage.classList.remove('hidden');
+                        loadingOverlay.classList.add('hidden');
+                    }
+                } catch (error) {
+                    await signOut(auth);
+                    errorMessage.textContent = 'Ocorreu um erro ao verificar seu perfil. Tente novamente.';
+                    errorMessage.classList.remove('hidden');
+                    loadingOverlay.classList.add('hidden');
+                }
+            } else {
+                loadingOverlay.classList.add('hidden');
             }
         });
 
@@ -150,7 +173,6 @@
                 registerTab.classList.remove('active');
                 registerFields.classList.add('hidden');
                 buttonText.textContent = 'Entrar';
-                // **CORREÇÃO APLICADA AQUI**
                 confirmPasswordInput.required = false;
                 unidadeSelect.required = false;
             } else {
@@ -158,7 +180,6 @@
                 registerTab.classList.add('active');
                 registerFields.classList.remove('hidden');
                 buttonText.textContent = 'Criar Conta';
-                // **CORREÇÃO APLICADA AQUI**
                 confirmPasswordInput.required = true;
                 unidadeSelect.required = true;
             }
@@ -167,7 +188,6 @@
         loginTab.addEventListener('click', () => setMode(true));
         registerTab.addEventListener('click', () => setMode(false));
         
-        // Estado inicial
         setMode(true);
 
         form.addEventListener('submit', async (e) => {
@@ -191,11 +211,10 @@
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     const user = userCredential.user;
                     
-                    // Salvar o perfil do usuário
                     const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
                     await setDoc(userProfileRef, { unidadeId: unidadeId, email: user.email });
                 }
-                // O onAuthStateChanged vai cuidar do redirecionamento
+                // O onAuthStateChanged vai cuidar da verificação e redirecionamento
             } catch (error) {
                 errorMessage.textContent = error.message.includes("auth/invalid-credential") ? "Email ou senha inválidos." : error.message;
                 errorMessage.classList.remove('hidden');
