@@ -110,7 +110,7 @@
             projectId: "mural-eletronico-nav",
             storageBucket: "mural-eletronico-nav.firebasestorage.app",
             messagingSenderId: "715537886137",
-            appId: "1:715537886137:web:f715e8fc9438df82722468",
+            appId: "1:715537886-web:f715e8fc9438df82722468",
             measurementId: "G-T2LLX_J94V"
         };
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
@@ -134,33 +134,38 @@
 
         let isLoginMode = true;
 
-        // **CORREÇÃO APLICADA AQUI**
         onAuthStateChanged(auth, async (user) => {
             if (user) {
+                console.log("DEBUG: Usuário autenticado detectado. UID:", user.uid);
                 loadingMessage.textContent = 'Verificando perfil...';
                 loadingOverlay.classList.remove('hidden');
 
                 try {
-                    const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
+                    const userProfilePath = `artifacts/${appId}/public/data/user_profiles/${user.uid}`;
+                    console.log("DEBUG: Tentando buscar perfil em:", userProfilePath);
+                    const userProfileRef = doc(db, userProfilePath);
                     const docSnap = await getDoc(userProfileRef);
 
                     if (docSnap.exists()) {
+                        console.log("DEBUG: Perfil encontrado:", docSnap.data());
                         loadingMessage.textContent = 'Acesso verificado. Redirecionando...';
                         window.location.href = 'admin.html';
                     } else {
-                        // Quebra o loop se o perfil não for encontrado, deslogando o usuário.
+                        console.error("DEBUG: ERRO CRÍTICO - Perfil não encontrado no banco de dados.");
                         await signOut(auth);
                         errorMessage.textContent = 'Seu perfil não foi encontrado. Por favor, tente se cadastrar novamente.';
                         errorMessage.classList.remove('hidden');
                         loadingOverlay.classList.add('hidden');
                     }
                 } catch (error) {
+                    console.error("DEBUG: ERRO ao buscar perfil:", error);
                     await signOut(auth);
                     errorMessage.textContent = 'Ocorreu um erro ao verificar seu perfil. Tente novamente.';
                     errorMessage.classList.remove('hidden');
                     loadingOverlay.classList.add('hidden');
                 }
             } else {
+                console.log("DEBUG: Nenhum usuário autenticado.");
                 loadingOverlay.classList.add('hidden');
             }
         });
@@ -201,8 +206,10 @@
 
             try {
                 if (isLoginMode) {
+                    console.log("DEBUG: Tentando fazer login...");
                     await signInWithEmailAndPassword(auth, email, password);
                 } else {
+                    console.log("DEBUG: Tentando criar nova conta...");
                     const confirmPassword = confirmPasswordInput.value;
                     const unidadeId = unidadeSelect.value;
                     if (password !== confirmPassword) throw new Error("As senhas não coincidem.");
@@ -211,11 +218,14 @@
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     const user = userCredential.user;
                     
-                    const userProfileRef = doc(db, `artifacts/${appId}/public/data/user_profiles`, user.uid);
+                    const userProfilePath = `artifacts/${appId}/public/data/user_profiles/${user.uid}`;
+                    console.log("DEBUG: Tentando criar perfil de usuário em:", userProfilePath);
+                    const userProfileRef = doc(db, userProfilePath);
                     await setDoc(userProfileRef, { unidadeId: unidadeId, email: user.email });
+                    console.log("DEBUG: Perfil criado com sucesso para o usuário:", user.uid);
                 }
-                // O onAuthStateChanged vai cuidar da verificação e redirecionamento
             } catch (error) {
+                console.error("DEBUG: Erro no formulário de autenticação:", error);
                 errorMessage.textContent = error.message.includes("auth/invalid-credential") ? "Email ou senha inválidos." : error.message;
                 errorMessage.classList.remove('hidden');
                 loadingOverlay.classList.add('hidden');
