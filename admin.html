@@ -159,6 +159,10 @@
         </section>
     </main>
 
+    <footer class="text-center text-sm text-gray-500 py-4 mt-auto">
+        <p>Desenvolvido por DNIZ by Wilkson</p>
+    </footer>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc, getDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -182,7 +186,6 @@
         const formError = document.getElementById('form-error');
         const loadingList = document.getElementById('loading-list');
 
-        // ALTERAÇÃO: Seletores para os novos elementos do cabeçalho
         const userInfoContainer = document.getElementById('user-info-container');
         const userEmailSpan = document.getElementById('user-email');
         const logoutButton = document.getElementById('logout-button');
@@ -237,7 +240,6 @@
                     authContainer.classList.add('hidden');
                     adminContent.classList.remove('hidden');
                     
-                    // ALTERAÇÃO: Exibe o e-mail e o container no cabeçalho
                     userEmailSpan.textContent = user.email;
                     userInfoContainer.classList.remove('hidden');
                     
@@ -262,7 +264,6 @@
                     authContainer.classList.remove('hidden');
                     adminContent.classList.add('hidden');
                     
-                    // ALTERAÇÃO: Esconde o container de informações do usuário
                     userInfoContainer.classList.add('hidden');
                     
                     loadingList.textContent = 'Aguardando login...';
