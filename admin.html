@@ -1,110 +1,407 @@
 <!DOCTYPE html>
-<script type="module">
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração do Mural</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --cor-primaria: #003366;
+            --cor-secundaria: #00a89d;
+            --cor-fundo: #f0f4f8;
+            --cor-texto: #333333;
+            --cor-branco: #ffffff;
+            --cor-erro: #e53e3e;
+            --cor-progresso: #2dd4bf;
+            --cor-sucesso: #48bb78;
+        }
+        body { background-color: var(--cor-fundo); font-family: 'Inter', sans-serif; color: var(--cor-texto); }
+        .header { background-color: var(--cor-primaria); color: var(--cor-branco); }
+        .btn-primary { background-color: var(--cor-primaria); color: var(--cor-branco); }
+        .btn-primary:hover { background-color: #004488; }
+        .btn-primary:disabled { background-color: #667b99; cursor: not-allowed; }
+        .btn-danger { background-color: var(--cor-erro); color: var(--cor-branco); }
+        .btn-danger:hover { background-color: #c53030; }
+        .btn-success { background-color: var(--cor-sucesso); color: var(--cor-branco); }
+        .btn-success:hover { background-color: #38a169; }
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--cor-primaria);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="header shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Painel de Administração</h1>
+        <div id="user-info-container" class="hidden flex items-center gap-4">
+            <span id="user-email" class="text-sm font-medium"></span>
+            <button id="logout-button" class="btn-danger font-bold py-2 px-3 rounded-lg text-sm">Sair</button>
+        </div>
+    </header>
+
+    <div id="auth-container" class="container mx-auto p-4 md:p-8 flex items-center justify-center flex-grow">
+        <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
+            <form id="login-form">
+                <h2 class="text-2xl font-bold mb-6 text-center text-[var(--cor-primaria)]">Acessar Painel</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium">Email</label>
+                        <input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium">Senha</label>
+                        <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <p id="login-error" class="text-sm text-[var(--cor-erro)] hidden"></p>
+                    <button type="submit" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">Entrar</button>
+                </div>
+                <p class="text-center text-sm mt-4">
+                    Não tem uma conta? <a href="#" id="show-register" class="font-medium text-[var(--cor-secundaria)] hover:underline">Cadastre-se</a>
+                </p>
+            </form>
+
+            <form id="register-form" class="hidden">
+                 <h2 class="text-2xl font-bold mb-6 text-center text-[var(--cor-primaria)]">Criar Conta</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="register-unidade" class="block text-sm font-medium">Sua Unidade (Ex: DNIZ)</label>
+                        <input type="text" id="register-unidade" required maxlength="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300 uppercase" placeholder="CÓDIGO DE 4 DÍGITOS">
+                    </div>
+                    <div>
+                        <label for="register-email" class="block text-sm font-medium">Email</label>
+                        <input type="email" id="register-email" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <div>
+                        <label for="register-password" class="block text-sm font-medium">Senha (mínimo 6 caracteres)</label>
+                        <input type="password" id="register-password" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                    </div>
+                    <p id="register-error" class="text-sm text-[var(--cor-erro)] hidden"></p>
+                    <button type="submit" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">Cadastrar</button>
+                </div>
+                 <p class="text-center text-sm mt-4">
+                    Já tem uma conta? <a href="#" id="show-login" class="font-medium text-[var(--cor-secundaria)] hover:underline">Faça login</a>
+                </p>
+            </form>
+        </div>
+    </div>
+    
+    <main id="admin-content" class="hidden container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
+            <form id="add-comunicado-form" class="space-y-4">
+                <div>
+                    <label for="unidade" class="block text-sm font-medium">Unidade</label>
+                    <input type="text" id="unidade" required maxlength="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300 uppercase">
+                </div>
+                <div>
+                    <label for="titulo" class="block text-sm font-medium">Título</label>
+                    <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <div>
+                    <label for="type" class="block text-sm font-medium">Tipo</label>
+                    <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                        <option value="text_image" selected>Texto e Imagem</option>
+                        <option value="iframe">Página Web (iframe)</option>
+                    </select>
+                </div>
+                <div id="fields-text-image" class="space-y-4">
+                    <div>
+                        <label for="imageUpload" class="block text-sm font-medium">Imagem (Opcional)</label>
+                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
+                    </div>
+                     <div class="flex items-center">
+                        <input type="checkbox" id="imageOnly" class="h-4 w-4 rounded border-gray-300 text-[var(--cor-primaria)] focus:ring-[var(--cor-primaria)]">
+                        <label for="imageOnly" class="ml-2 block text-sm">Apenas imagem (tela cheia)</label>
+                    </div>
+                    <div id="texto-container">
+                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
+                    </div>
+                    <div id="upload-progress-container" class="hidden space-y-2">
+                        <label class="block text-sm font-medium">Progresso</label>
+                        <div class="progress-bar-bg w-full h-2.5">
+                            <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="fields-iframe" class="hidden space-y-4">
+                    <div>
+                        <label for="url" class="block text-sm font-medium">URL da Página Web</label>
+                        <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
+                    </div>
+                </div>
+                <div>
+                    <label for="duracao" class="block text-sm font-medium">Duração (segundos)</label>
+                    <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">
+                    Adicionar Comunicado
+                </button>
+                 <p id="form-error" class="text-sm text-[var(--cor-erro)] hidden"></p>
+            </form>
+        </section>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
+            <p id="comunicados-status-msg">Aguardando login...</p>
+            <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-2"></div>
+        </section>
+        
+        <section id="approval-section" class="hidden lg:col-span-2 bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Aprovações Pendentes</h2>
+            <div id="pending-users-list" class="space-y-3">
+                <p>Carregando usuários...</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="text-center text-sm text-gray-500 py-4 mt-auto">
+        <p>Desenvolvido por DNIZ by Wilkson</p>
+    </footer>
+
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc, getDoc, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // ... (resto das importações)
-
-        // ... (seletores de elementos DOM, como authContainer, adminContent, etc.)
-        const comunicadosStatusMsg = document.getElementById('comunicados-status-msg');
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        try {
-            // ... (configuração do Firebase, que já está correta)
+        // Seletores de Elementos DOM
+        const authContainer = document.getElementById('auth-container');
+        const adminContent = document.getElementById('admin-content');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const showRegisterLink = document.getElementById('show-register');
+        const showLoginLink = document.getElementById('show-login');
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+        const formError = document.getElementById('form-error');
+        const userInfoContainer = document.getElementById('user-info-container');
+        const userEmailSpan = document.getElementById('user-email');
+        const logoutButton = document.getElementById('logout-button');
+        const approvalSection = document.getElementById('approval-section');
+        const pendingUsersList = document.getElementById('pending-users-list');
+        const comunicadosStatusMsg = document.getElementById('comunicados-status-msg');
 
+        let unsubscribeComunicados = null;
+        let unsubscribePendingUsers = null;
+
+        // Funções de Utilidade
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+        function clearError(element) {
+            element.textContent = '';
+            element.classList.add('hidden');
+        }
+
+        try {
+            // Configuração do Firebase
+            const userFirebaseConfig = {
+                apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
+                authDomain: "mural-eletronico-nav.firebaseapp.com",
+                projectId: "mural-eletronico-nav",
+                storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+                messagingSenderId: "715537886137",
+                appId: "1:715537886137:web:f715e8fc9438df82722468",
+                measurementId: "G-T2LLX-J94V"
+            };
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
+            if (!firebaseConfig || !firebaseConfig.projectId) {
+                 throw new Error("Configuração do Firebase inválida ou 'projectId' ausente.");
+            }
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const storage = getStorage(app);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+            let comunicadosCollection;
+
+            // Lógica de UI
+            showRegisterLink.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); registerForm.classList.remove('hidden'); });
+            showLoginLink.addEventListener('click', (e) => { e.preventDefault(); registerForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
+            logoutButton.addEventListener('click', async () => { await signOut(auth); });
+
+            // Gerenciador de Autenticação
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
-                    console.log("Usuário autenticado:", user.email); // LOG DE DIAGNÓSTICO
                     const userDocRef = doc(db, "users", user.uid);
                     const userDocSnap = await getDoc(userDocRef);
 
-                    if (userDocSnap.exists()) {
-                        const userData = userDocSnap.data();
-                        console.log("Dados do usuário encontrados:", userData); // LOG DE DIAGNÓSTICO
+                    if (!userDocSnap.exists()) {
+                        showError(loginError, "Dados de usuário não encontrados. Tente se cadastrar.");
+                        await signOut(auth);
+                        return;
+                    }
 
-                        // ... (verificação de status 'pending')
+                    const userData = userDocSnap.data();
 
-                        document.getElementById('unidade').value = userData.unidade;
-                        loadComunicados(userData.unidade);
+                    if (userData.status === 'pending') {
+                        showError(loginError, "Sua conta aguarda aprovação do administrador.");
+                        await signOut(auth);
+                        return;
+                    }
+                    
+                    // Configura UI para usuário logado
+                    authContainer.classList.add('hidden');
+                    adminContent.classList.remove('hidden');
+                    userEmailSpan.textContent = user.email;
+                    userInfoContainer.classList.remove('hidden');
+                    document.getElementById('unidade').value = userData.unidade;
+                    
+                    comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+                    loadComunicados(userData.unidade);
 
-                        if (userData.role === 'master') {
-                            console.log("Usuário é MASTER. Carregando painel de aprovação."); // LOG DE DIAGNÓSTICO
-                            approvalSection.classList.remove('hidden');
-                            loadPendingUsers();
-                        }
-                    } else {
-                        console.error("Documento do usuário NÃO encontrado no Firestore para o UID:", user.uid); // LOG DE DIAGNÓSTICO
-                        // ...
+                    if (userData.role === 'master') {
+                        approvalSection.classList.remove('hidden');
+                        loadPendingUsers();
                     }
                 } else {
-                    console.log("Nenhum usuário logado."); // LOG DE DIAGNÓSTICO
-                    // ... (lógica de logout)
+                    // Limpa a UI no logout
+                    if (unsubscribeComunicados) unsubscribeComunicados();
+                    if (unsubscribePendingUsers) unsubscribePendingUsers();
+                    authContainer.classList.remove('hidden');
+                    adminContent.classList.add('hidden');
+                    userInfoContainer.classList.add('hidden');
+                    approvalSection.classList.add('hidden');
+                    comunicadosStatusMsg.textContent = 'Aguardando login...';
+                    comunicadosStatusMsg.style.display = 'block';
+                    document.getElementById('comunicados-list').innerHTML = '';
+                    clearError(loginError);
                 }
             });
 
-            // ... (código dos formulários de login e cadastro)
+            // Lógica de Cadastro
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
+                const email = registerForm['register-email'].value;
+                const password = registerForm['register-password'].value;
+                clearError(registerError);
+                if (!unidade) { showError(registerError, "O campo 'Sua Unidade' é obrigatório."); return; }
+                if (password.length < 6) { showError(registerError, "A senha deve ter no mínimo 6 caracteres."); return; }
 
-            function loadComunicados(unidadeDoUsuario) {
-                console.log(`Iniciando loadComunicados para a unidade: "${unidadeDoUsuario}"`); // LOG DE DIAGNÓSTICO
-                
-                if (unsubscribeListener) { unsubscribeListener(); }
-                if (!unidadeDoUsuario) {
-                    console.error("loadComunicados falhou: unidadeDoUsuario está vazia."); // LOG DE DIAGNÓSTICO
-                    comunicadosStatusMsg.textContent = 'Unidade do usuário não encontrada.';
-                    return;
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    const user = userCredential.user;
+                    await setDoc(doc(db, "users", user.uid), {
+                        unidade: unidade, email: user.email, status: 'pending', role: 'regular'
+                    });
+                    registerForm.reset();
+                    showError(loginError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
+                    showLoginLink.click();
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') { showError(registerError, 'Este e-mail já está em uso.'); } 
+                    else { showError(registerError, 'Erro ao cadastrar.'); console.error("Register error:", error); }
                 }
+            });
+
+            // Lógica de Login
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = loginForm['login-email'].value;
+                const password = loginForm['login-password'].value;
+                clearError(loginError);
+                try { await signInWithEmailAndPassword(auth, email, password); loginForm.reset(); } 
+                catch (error) { showError(loginError, 'E-mail ou senha inválidos.'); }
+            });
+
+            // Lógica do Formulário de Comunicados
+            const form = document.getElementById('add-comunicado-form');
+            form.addEventListener('submit', async (e) => { /* ... Lógica do formulário de comunicados ... */ });
+            
+            // Funções de Carregamento de Dados
+            function loadComunicados(unidadeDoUsuario) {
+                if (unsubscribeComunicados) unsubscribeComunicados();
                 
                 comunicadosStatusMsg.textContent = `Carregando comunicados para ${unidadeDoUsuario}...`;
                 comunicadosStatusMsg.style.display = 'block';
 
-                const comunicadosRef = collection(db, "artifacts/default-mural-app/public/data/comunicados");
-                const q = query(comunicadosRef, where("unidade", "==", unidadeDoUsuario));
-                console.log("Query dos Comunicados criada:", q); // LOG DE DIAGNÓSTICO
+                const q = query(collection(db, `artifacts/${appId}/public/data/comunicados`), where("unidade", "==", unidadeDoUsuario));
 
-                unsubscribeListener = onSnapshot(q, (snapshot) => {
-                    console.log(`Snapshot dos Comunicados recebido. Documentos encontrados: ${snapshot.size}`); // LOG DE DIAGNÓSTICO
+                unsubscribeComunicados = onSnapshot(q, (snapshot) => {
                     const listContainer = document.getElementById('comunicados-list');
                     listContainer.innerHTML = ''; 
 
                     if (snapshot.empty) {
-                        comunicadosStatusMsg.textContent = `Nenhum comunicado cadastrado para a unidade ${unidadeDoUsuario}.`;
+                        comunicadosStatusMsg.textContent = `Nenhum comunicado para a unidade ${unidadeDoUsuario}.`;
                         comunicadosStatusMsg.style.display = 'block';
                         return;
                     }
                     
                     comunicadosStatusMsg.style.display = 'none';
-                    // ... (resto da função que renderiza a lista)
+                    const comunicados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    comunicados.sort((a, b) => (b.createdAt.toDate ? b.createdAt.toDate().getTime() : b.createdAt) - (a.createdAt.toDate ? a.createdAt.toDate().getTime() : a.createdAt));
+
+                    comunicados.forEach(data => {
+                        const div = document.createElement('div');
+                        div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
+                        // ... innerHTML para o item do comunicado ...
+                        listContainer.appendChild(div);
+                    });
+
+                    listContainer.querySelectorAll('.delete-btn').forEach(button => { /* ... Lógica do delete ... */ });
                 }, (error) => {
-                    console.error("ERRO no onSnapshot dos Comunicados:", error); // LOG DE DIAGNÓSTICO
+                    console.error("Erro ao carregar comunicados:", error);
                     comunicadosStatusMsg.textContent = 'Erro ao carregar comunicados.';
                     comunicadosStatusMsg.style.display = 'block';
                 });
             }
 
             function loadPendingUsers() {
-                console.log("Iniciando loadPendingUsers..."); // LOG DE DIAGNÓSTICO
-                const usersRef = collection(db, "users");
-                const q = query(usersRef, where("status", "==", "pending"));
-                console.log("Query de Usuários Pendentes criada:", q); // LOG DE DIAGNÓSTICO
+                if (unsubscribePendingUsers) unsubscribePendingUsers();
+                
+                const q = query(collection(db, "users"), where("status", "==", "pending"));
 
-                onSnapshot(q, (snapshot) => {
-                    console.log(`Snapshot de Usuários Pendentes recebido. Documentos encontrados: ${snapshot.size}`); // LOG DE DIAGNÓSTICO
+                unsubscribePendingUsers = onSnapshot(q, (snapshot) => {
+                    pendingUsersList.innerHTML = '';
                     if (snapshot.empty) {
                         pendingUsersList.innerHTML = '<p class="text-gray-500">Nenhum usuário aguardando aprovação.</p>';
                         return;
                     }
-
-                    pendingUsersList.innerHTML = '';
-                    // ... (resto da função que renderiza a lista)
+                    snapshot.forEach(docSnap => {
+                        const userData = docSnap.data();
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'flex justify-between items-center p-2 border rounded-md';
+                        userDiv.innerHTML = `<div><p class="font-semibold">${userData.email}</p><p class="text-sm text-gray-600">Unidade: ${userData.unidade}</p></div><button data-uid="${docSnap.id}" class="approve-btn btn-success text-sm py-1 px-3 rounded-md">Aprovar</button>`;
+                        pendingUsersList.appendChild(userDiv);
+                    });
                 }, (error) => {
-                    console.error("ERRO no onSnapshot dos Usuários Pendentes:", error); // LOG DE DIAGNÓSTICO
+                    console.error("Erro ao carregar usuários pendentes:", error);
+                    pendingUsersList.innerHTML = '<p class="text-red-500">Erro ao carregar usuários.</p>';
                 });
             }
-
-            // ... (Resto do seu código)
+            
+            // Lógica de Aprovação
+            pendingUsersList.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('approve-btn')) {
+                    const uid = e.target.dataset.uid;
+                    e.target.disabled = true;
+                    e.target.textContent = 'Aprovando...';
+                    try {
+                        await updateDoc(doc(db, "users", uid), { status: 'approved' });
+                    } catch (err) {
+                        console.error("Erro ao aprovar usuário: ", err);
+                        e.target.disabled = false;
+                        e.target.textContent = 'Aprovar';
+                    }
+                }
+            });
 
         } catch(error) {
             console.error("Erro de inicialização:", error);
-            showError(loginError, `Erro Crítico: ${error.message}`);
+            // Tenta mostrar o erro na tela, mas a função pode não estar definida ainda
+            const loginErrorEl = document.getElementById('login-error');
+            if (loginErrorEl) {
+                loginErrorEl.textContent = `Erro Crítico na Inicialização: ${error.message}`;
+                loginErrorEl.classList.remove('hidden');
+            }
         }
     </script>
 </body>
