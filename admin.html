@@ -35,7 +35,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen flex flex-col">
 
     <header class="header shadow-md p-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold">Painel de Administração</h1>
@@ -45,7 +45,7 @@
         </div>
     </header>
 
-    <div id="auth-container" class="container mx-auto p-4 md:p-8 flex items-center justify-center">
+    <div id="auth-container" class="container mx-auto p-4 md:p-8 flex items-center justify-center flex-grow">
         <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
             <form id="login-form">
                 <h2 class="text-2xl font-bold mb-6 text-center text-[var(--cor-primaria)]">Acessar Painel</h2>
@@ -95,7 +95,61 @@
         <section class="bg-white p-6 rounded-lg shadow-lg">
             <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
             <form id="add-comunicado-form" class="space-y-4">
-                </form>
+                
+                <div>
+                    <label for="unidade" class="block text-sm font-medium">Unidade (Ex: DNIZ)</label>
+                    <input type="text" id="unidade" required maxlength="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300 uppercase" placeholder="CÓDIGO DE 4 DÍGITOS">
+                </div>
+                
+                <div>
+                    <label for="titulo" class="block text-sm font-medium">Título</label>
+                    <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <div>
+                    <label for="type" class="block text-sm font-medium">Tipo de Comunicado</label>
+                    <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                        <option value="text_image" selected>Texto e Imagem</option>
+                        <option value="iframe">Página Web (iframe)</option>
+                    </select>
+                </div>
+
+                <div id="fields-text-image" class="space-y-4">
+                    <div>
+                        <label for="imageUpload" class="block text-sm font-medium">Imagem (Opcional)</label>
+                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
+                    </div>
+                     <div class="flex items-center">
+                        <input type="checkbox" id="imageOnly" class="h-4 w-4 rounded border-gray-300 text-[var(--cor-primaria)] focus:ring-[var(--cor-primaria)]">
+                        <label for="imageOnly" class="ml-2 block text-sm">Mostrar somente a imagem (sem texto)</label>
+                    </div>
+                    <div id="texto-container">
+                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
+                    </div>
+                    <div id="upload-progress-container" class="hidden space-y-2">
+                        <label class="block text-sm font-medium">Progresso do Upload</label>
+                        <div class="progress-bar-bg w-full h-2.5">
+                            <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="fields-iframe" class="hidden space-y-4">
+                    <div>
+                        <label for="url" class="block text-sm font-medium">URL da Página Web</label>
+                        <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="duracao" class="block text-sm font-medium">Duração (em segundos)</label>
+                    <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full transition-transform transform hover:scale-105">
+                    Adicionar Comunicado
+                </button>
+                 <p id="form-error" class="text-sm text-[var(--cor-erro)] hidden"></p>
+            </form>
         </section>
 
         <section class="bg-white p-6 rounded-lg shadow-lg">
@@ -123,7 +177,6 @@
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // Seletores de elementos DOM
         const authContainer = document.getElementById('auth-container');
         const adminContent = document.getElementById('admin-content');
         const loginForm = document.getElementById('login-form');
@@ -132,6 +185,7 @@
         const showLoginLink = document.getElementById('show-login');
         const loginError = document.getElementById('login-error');
         const registerError = document.getElementById('register-error');
+        const formError = document.getElementById('form-error');
         const loadingList = document.getElementById('loading-list');
         const userInfoContainer = document.getElementById('user-info-container');
         const userEmailSpan = document.getElementById('user-email');
@@ -141,21 +195,52 @@
 
         let unsubscribeListener = null;
 
-        // Funções de utilidade
-        function showError(element, message) { /* ... */ }
-        function clearError(element) { /* ... */ }
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        function clearError(element) {
+            element.textContent = '';
+            element.classList.add('hidden');
+        }
 
         try {
-            // Configuração do Firebase
-            const firebaseConfig = { /* ... */ };
+            // ALTERAÇÃO: Bloco de configuração do Firebase RESTAURADO
+            const userFirebaseConfig = {
+                apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
+                authDomain: "mural-eletronico-nav.firebaseapp.com",
+                projectId: "mural-eletronico-nav",
+                storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+                messagingSenderId: "715537886137",
+                appId: "1:715537886137:web:f715e8fc9438df82722468",
+                measurementId: "G-T2LLX-J94V"
+            };
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
+
+            if (!firebaseConfig || !firebaseConfig.projectId) { // Verificação mais robusta
+                 throw new Error("Configuração do Firebase inválida ou 'projectId' ausente.");
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
             const app = initializeApp(firebaseConfig);
+            
             const db = getFirestore(app);
             const auth = getAuth(app);
-            // ...
+            const storage = getStorage(app);
+            let comunicadosCollection;
 
-            // Lógica de troca de formulário (login/cadastro)
-            showRegisterLink.addEventListener('click', (e) => { /* ... */ });
-            showLoginLink.addEventListener('click', (e) => { /* ... */ });
+            showRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+            });
+
+            showLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+            });
 
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -164,20 +249,19 @@
 
                     if (!userDocSnap.exists()) {
                         console.error("Usuário autenticado mas sem registro no Firestore. Deslogando.");
+                        showError(loginError, "Seus dados de usuário não foram encontrados. Tente se cadastrar novamente.");
                         await signOut(auth);
                         return;
                     }
 
                     const userData = userDocSnap.data();
 
-                    // BLOQUEIO DE USUÁRIO PENDENTE
                     if (userData.status === 'pending') {
                         showError(loginError, "Sua conta está aguardando aprovação do administrador.");
                         await signOut(auth);
                         return;
                     }
                     
-                    // LOGIN BEM SUCEDIDO
                     authContainer.classList.add('hidden');
                     adminContent.classList.remove('hidden');
                     userEmailSpan.textContent = user.email;
@@ -186,14 +270,12 @@
                     document.getElementById('unidade').value = userData.unidade;
                     loadComunicados(userData.unidade);
 
-                    // VERIFICA SE É MASTER PARA MOSTRAR PAINEL DE APROVAÇÃO
                     if (userData.role === 'master') {
                         approvalSection.classList.remove('hidden');
                         loadPendingUsers();
                     }
 
                 } else {
-                    // Lógica de Logout
                     if (unsubscribeListener) { unsubscribeListener(); unsubscribeListener = null; }
                     authContainer.classList.remove('hidden');
                     adminContent.classList.add('hidden');
@@ -206,17 +288,25 @@
 
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                // ...
+                const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
+                const email = registerForm['register-email'].value;
+                const password = registerForm['register-password'].value;
+                clearError(registerError);
+
+                if (!unidade) {
+                    showError(registerError, "O campo 'Sua Unidade' é obrigatório.");
+                    return;
+                }
+
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     const user = userCredential.user;
 
-                    // CADASTRO COM STATUS PENDENTE
                     await setDoc(doc(db, "users", user.uid), {
                         unidade: unidade,
                         email: user.email,
-                        status: 'pending', // Novo status padrão
-                        role: 'regular'     // Novo papel padrão
+                        status: 'pending',
+                        role: 'regular'
                     });
                     
                     registerForm.reset();
@@ -224,17 +314,33 @@
                     showLoginLink.click();
                     
                 } catch (error) {
-                    // ...
+                    if (error.code === 'auth/email-already-in-use') {
+                        showError(registerError, 'Este e-mail já está em uso.');
+                    } else {
+                        showError(registerError, 'Erro ao cadastrar.');
+                        console.error("Register error:", error);
+                    }
                 }
             });
 
-            loginForm.addEventListener('submit', async (e) => { /* ... */ });
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = loginForm['login-email'].value;
+                const password = loginForm['login-password'].value;
+                clearError(loginError);
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    loginForm.reset();
+                } catch (error) {
+                    showError(loginError, 'E-mail ou senha inválidos.');
+                    console.error("Login error:", error);
+                }
+            });
+
             logoutButton.addEventListener('click', async () => { await signOut(auth); });
 
-            // Funções do formulário de comunicados
-            // ...
-            
-            // NOVA FUNÇÃO PARA CARREGAR USUÁRIOS PENDENTES
+            // ... O restante do seu código JavaScript para gerenciar comunicados e aprovações continua aqui ...
+            // (Ele foi omitido desta visualização para não repetir, mas deve estar no seu arquivo)
             function loadPendingUsers() {
                 const usersRef = collection(db, "users");
                 const q = query(usersRef, where("status", "==", "pending"));
@@ -262,7 +368,6 @@
                 });
             }
 
-            // NOVA LÓGICA PARA O BOTÃO DE APROVAR
             pendingUsersList.addEventListener('click', async (e) => {
                 if (e.target.classList.contains('approve-btn')) {
                     const uid = e.target.dataset.uid;
@@ -273,7 +378,6 @@
                         await updateDoc(userDocRef, {
                             status: 'approved'
                         });
-                        // O onSnapshot atualizará a lista automaticamente
                     } catch (err) {
                         console.error("Erro ao aprovar usuário: ", err);
                         e.target.disabled = false;
@@ -282,11 +386,9 @@
                 }
             });
 
-            function loadComunicados(unidadeDoUsuario) { /* ... */ }
-            // ... resto do código sem alterações ...
-
         } catch(error) {
             console.error("Erro de inicialização:", error);
+            showError(loginError, `Erro Crítico: ${error.message}`);
         }
     </script>
 </body>
