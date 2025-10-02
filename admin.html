@@ -271,7 +271,7 @@
                 }
             });
 
-            registerForm.addEventListener('submit', async (e) => {
+           registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
                 const email = registerForm['register-email'].value;
@@ -286,15 +286,19 @@
                     await setDoc(doc(db, "users", user.uid), {
                         unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                     });
+                    
                     registerForm.reset();
-                    showError(loginError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
+                    
+                    // ALTERAÇÃO: Substituímos a mensagem de texto por um alert mais claro.
+                    alert("Cadastro realizado com sucesso! Sua conta agora está pendente de aprovação por um administrador.");
+                    
                     showLoginLink.click();
+                    
                 } catch (error) {
                     if (error.code === 'auth/email-already-in-use') { showError(registerError, 'Este e-mail já está em uso.'); } 
                     else { showError(registerError, 'Erro ao cadastrar.'); console.error("Register error:", error); }
                 }
             });
-
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const email = loginForm['login-email'].value;
