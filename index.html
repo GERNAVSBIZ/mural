@@ -93,7 +93,7 @@
 <body class="flex flex-col h-screen">
 
     <header class="header shadow-md p-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold">Mural de Comunicados - DNIZ</h1>
+        <h1 id="header-title" class="text-2xl font-bold">Mural de Comunicados</h1>
         <div id="clock" class="text-xl"></div>
     </header>
 
@@ -105,40 +105,48 @@
             <p class="text-xl mt-2">Adicione novos avisos no painel de administração.</p>
         </div>
     </main>
+
+    <footer class="fixed bottom-0 left-0 right-0 p-2 text-center text-xs text-white bg-black/30 backdrop-blur-sm">
+        <p>Desenvolvido por DNIZ by Wilkson</p>
+    </footer>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const carouselContainer = document.getElementById('carousel-container');
         const loadingMessage = document.getElementById('loading-message');
         const emptyMessage = document.getElementById('empty-message');
         const errorMessage = document.getElementById('error-message');
+        const headerTitle = document.getElementById('header-title');
 
         function showError(message) {
             loadingMessage.classList.add('hidden');
             emptyMessage.classList.add('hidden');
             carouselContainer.innerHTML = '';
             errorMessage.classList.remove('hidden');
-            errorMessage.innerHTML = `<strong>Erro na Configuração:</strong><br>${message}`;
+            errorMessage.innerHTML = `<strong>Erro:</strong><br>${message}`;
         }
 
         try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const unidade = urlParams.get('unidade');
+
+            if (!unidade) {
+                showError("Nenhuma unidade especificada. Adicione '?unidade=SEUCODIGO' ao final da URL.");
+                throw new Error("Parâmetro 'unidade' ausente na URL.");
+            }
+
+            headerTitle.textContent = `Mural de Comunicados - ${unidade.toUpperCase()}`;
+
             const userFirebaseConfig = {
                 apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
-
 				authDomain: "mural-eletronico-nav.firebaseapp.com",
-
 				projectId: "mural-eletronico-nav",
-
 				storageBucket: "mural-eletronico-nav.firebasestorage.app",
-
 				messagingSenderId: "715537886137",
-
 				appId: "1:715537886137:web:f715e8fc9438df82722468",
-
-				measurementId: "G-T2LLX1J94V"
-
+				measurementId: "G-T2LLX-J94V"
             };
 
             const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -146,7 +154,7 @@
                 : userFirebaseConfig;
 
             if (!firebaseConfig || !firebaseConfig.apiKey) {
-                throw new Error("A configuração do Firebase não foi encontrada. Cole seu objeto firebaseConfig na variável 'userFirebaseConfig'.");
+                throw new Error("A configuração do Firebase não foi encontrada.");
             }
             
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
@@ -163,8 +171,10 @@
 
                 if (comunicados.length === 0) {
                     loadingMessage.classList.add('hidden');
+                    emptyMessage.querySelector('h2').textContent = `Nenhum comunicado para a unidade ${unidade.toUpperCase()}.`;
+                    emptyMessage.querySelector('p').textContent = 'Adicione novos avisos no painel de administração.';
                     emptyMessage.classList.remove('hidden');
-                    if (slideInterval) clearInterval(slideInterval); // Para o carrossel se a lista ficar vazia
+                    if (slideInterval) clearInterval(slideInterval);
                     return;
                 }
                 
@@ -183,7 +193,10 @@
                                 <iframe src="${comunicado.url}" class="w-full h-full border-0 rounded" title="${comunicado.titulo}"></iframe>
                             </div>
                         `;
-                    } else {
+                    } else if (comunicado.imageOnly) {
+                         slide.innerHTML = `<img src="${comunicado.imageUrl}" alt="${comunicado.titulo}" class="w-full h-full object-contain">`;
+                    }
+                    else {
                         const hasImage = comunicado.imageUrl && comunicado.imageUrl.trim() !== '';
                         const slideContent = document.createElement('div');
                         slideContent.className = 'slide-content' + (hasImage ? ' has-image' : '');
@@ -222,20 +235,24 @@
 
             function startCarousel(comunicados) {
                 if (slideInterval) clearInterval(slideInterval);
-                currentSlideIndex = 0; // Sempre reinicia do primeiro slide
+                currentSlideIndex = 0;
                  if (slides.length > 0 && slides[0]) {
                     slides.forEach(s => s.classList.remove('active'));
                     slides[0].classList.add('active');
                 }
 
-                if (comunicados.length > 1) {
+                if (comunicados.length > 0) {
                      const firstDuration = (parseInt(comunicados[0].duracao, 10) || 10) * 1000;
-                     slideInterval = setInterval(() => showNextSlide(comunicados), firstDuration);
+                     if (comunicados.length > 1) {
+                        slideInterval = setInterval(() => showNextSlide(comunicados), firstDuration);
+                     }
                 }
             }
             
             const comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
-            onSnapshot(query(comunicadosCollection), (snapshot) => {
+            const q = query(comunicadosCollection, where("unidade", "==", unidade.toUpperCase()));
+
+            onSnapshot(q, (snapshot) => {
                 const comunicados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderSlides(comunicados);
             }, (error) => {
@@ -244,8 +261,7 @@
             });
 
         } catch(error) {
-            console.error("Erro de inicialização do Firebase:", error);
-            showError(error.message);
+            console.error("Erro de inicialização:", error);
         }
 
         const clockElement = document.getElementById('clock');
@@ -258,4 +274,3 @@
     </script>
 </body>
 </html>
-
