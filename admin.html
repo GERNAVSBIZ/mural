@@ -14,7 +14,7 @@
             --cor-branco: #ffffff;
             --cor-erro: #e53e3e;
             --cor-progresso: #2dd4bf;
-            --cor-sucesso: #48bb78; /* Verde para mensagens de sucesso */
+            --cor-sucesso: #48bb78;
         }
         body { background-color: var(--cor-fundo); font-family: 'Inter', sans-serif; color: var(--cor-texto); }
         .header { background-color: var(--cor-primaria); color: var(--cor-branco); }
@@ -30,7 +30,6 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.2);
         }
-        /* Classe para texto de sucesso */
         .text-sucesso { color: var(--cor-sucesso); }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,20 +101,29 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc, getDoc, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, query, setDoc, getDoc, where, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // ... (seletores de elementos DOM)
+        // --- SELETORES DE ELEMENTOS ---
+        const authContainer = document.getElementById('auth-container');
+        const adminContent = document.getElementById('admin-content');
+        const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
+        const showRegisterLink = document.getElementById('show-register');
+        const showLoginLink = document.getElementById('show-login');
         const loginError = document.getElementById('login-error');
-        // ALTERAÇÃO: Renomeado para um nome genérico, pois exibirá sucesso e erro.
         const registerMessage = document.getElementById('register-message');
-        
+        const userInfoContainer = document.getElementById('user-info-container');
+        const userEmailSpan = document.getElementById('user-email');
+        const logoutButton = document.getElementById('logout-button');
+        const approvalSection = document.getElementById('approval-section');
+        const pendingUsersList = document.getElementById('pending-users-list');
+        const comunicadosStatusMsg = document.getElementById('comunicados-status-msg');
+
         let unsubscribeComunicados = null;
         let unsubscribePendingUsers = null;
 
-        // ALTERAÇÃO: Função genérica para mostrar mensagens, com opção de cor para sucesso/erro
+        // --- FUNÇÕES DE UTILIDADE ---
         function showMessage(element, message, isSuccess = false) {
             element.textContent = message;
             element.classList.remove('hidden');
@@ -131,14 +139,76 @@
         function clearMessage(element) {
             element.textContent = '';
             element.classList.add('hidden');
+            element.classList.remove('text-sucesso', 'text-[var(--cor-erro)]');
         }
 
+        // --- INICIALIZAÇÃO E LÓGICA PRINCIPAL ---
         try {
-            // ... (Configuração do Firebase)
-            const firebaseConfig = { /* ... */ };
-            // ... (Resto da inicialização)
+            const userFirebaseConfig = {
+                apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
+                authDomain: "mural-eletronico-nav.firebaseapp.com",
+                projectId: "mural-eletronico-nav",
+                storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+                messagingSenderId: "715537886137",
+                appId: "1:715537886137:web:f715e8fc9438df82722468",
+                measurementId: "G-T2LLX-J94V"
+            };
+            const app = initializeApp(userFirebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
 
-            // ... (onAuthStateChanged e outras lógicas que já funcionam)
+            // --- EVENTOS DE UI (INTERFACE DO USUÁRIO) ---
+            // CORREÇÃO: Estes eventos agora estão no topo para garantir que sejam registrados.
+            showRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearMessage(loginError);
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+            });
+            
+            showLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearMessage(registerMessage);
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+            });
+
+            logoutButton.addEventListener('click', async () => { await signOut(auth); });
+
+            // --- LÓGICA DE AUTENTICAÇÃO E DADOS ---
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    const userDocRef = doc(db, "users", user.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+
+                    if (!userDocSnap.exists()) {
+                        showMessage(loginError, "Dados de usuário não encontrados. Tente se cadastrar.");
+                        await signOut(auth);
+                        return;
+                    }
+
+                    const userData = userDocSnap.data();
+
+                    if (userData.status === 'pending') {
+                        showMessage(loginError, "Sua conta aguarda aprovação do administrador.");
+                        await signOut(auth);
+                        return;
+                    }
+                    
+                    authContainer.classList.add('hidden');
+                    adminContent.classList.remove('hidden');
+                    userEmailSpan.textContent = user.email;
+                    userInfoContainer.classList.remove('hidden');
+                } else {
+                    if (unsubscribeComunicados) unsubscribeComunicados();
+                    if (unsubscribePendingUsers) unsubscribePendingUsers();
+                    authContainer.classList.remove('hidden');
+                    adminContent.classList.add('hidden');
+                    userInfoContainer.classList.add('hidden');
+                    clearMessage(loginError);
+                }
+            });
 
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -159,28 +229,38 @@
                     });
                     
                     registerForm.reset();
-                    
-                    // ALTERAÇÃO: Usa a nova função para exibir a mensagem de sucesso em verde
                     showMessage(registerMessage, "Cadastro realizado! Aguarde a aprovação do administrador.", true);
                     
                 } catch (error) {
-                    console.error("ERRO NO CADASTRO:", error);
-
                     if (error.code === 'auth/email-already-in-use') { 
                         showMessage(registerMessage, 'Este e-mail já está em uso.'); 
                     } else if (error.code === 'auth/invalid-email') {
                         showMessage(registerMessage, 'O formato do e-mail é inválido.');
-                    }
-                    else { 
+                    } else { 
                         showMessage(registerMessage, 'Ocorreu um erro ao cadastrar.'); 
                     }
                 }
             });
-            
-            // ... (Resto do código, como loginForm, loadComunicados, loadPendingUsers, etc.)
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearMessage(loginError);
+                const email = loginForm['login-email'].value;
+                const password = loginForm['login-password'].value;
+                try { 
+                    await signInWithEmailAndPassword(auth, email, password);
+                    loginForm.reset(); 
+                } catch (error) { 
+                    showMessage(loginError, 'E-mail ou senha inválidos.'); 
+                }
+            });
 
         } catch(error) {
-            // ... (Bloco catch de inicialização)
+            console.error("Erro de inicialização:", error);
+            const loginErrorEl = document.getElementById('login-error');
+            if (loginErrorEl) {
+                showMessage(loginErrorEl, `Erro Crítico na Inicialização: ${error.message}`);
+            }
         }
     </script>
 </body>
