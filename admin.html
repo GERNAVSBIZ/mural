@@ -171,6 +171,7 @@
     import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
     
+    // ... (todas as suas constantes 'const' permanecem as mesmas)
     const authContainer = document.getElementById('auth-container');
     const adminContent = document.getElementById('admin-content');
     const loginForm = document.getElementById('login-form');
@@ -195,7 +196,7 @@
 
     let unsubscribeComunicados = null;
     let unsubscribePendingUsers = null;
-    let comunicadosCollection; // Movido para um escopo mais alto
+    let comunicadosCollection;
 
     function showError(element, message) {
         element.textContent = message;
@@ -207,18 +208,11 @@
         element.classList.add('hidden');
     }
     
-    // Mostra/Esconde campos baseados no tipo de comunicado
     typeSelect.addEventListener('change', () => {
-        if (typeSelect.value === 'iframe') {
-            fieldsTextImage.classList.add('hidden');
-            fieldsIframe.classList.remove('hidden');
-        } else {
-            fieldsTextImage.classList.remove('hidden');
-            fieldsIframe.classList.add('hidden');
-        }
+        fieldsTextImage.classList.toggle('hidden', typeSelect.value === 'iframe');
+        fieldsIframe.classList.toggle('hidden', typeSelect.value !== 'iframe');
     });
 
-    // Mostra/Esconde campo de texto se "apenas imagem" for marcado
     imageOnlyCheckbox.addEventListener('change', () => {
         textoContainer.style.display = imageOnlyCheckbox.checked ? 'none' : 'block';
     });
@@ -229,7 +223,6 @@
             apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
             authDomain: "mural-eletronico-nav.firebaseapp.com",
             projectId: "mural-eletronico-nav",
-            // ### LINHA CORRIGIDA AQUI ###
             storageBucket: "mural-eletronico-nav.firebasestorage.app", 
             messagingSenderId: "715537886137",
             appId: "1:715537886137:web:f715e8fc9438df82722468",
@@ -254,26 +247,26 @@
                 const userDocRef = doc(db, "users", user.uid);
                 const userDocSnap = await getDoc(userDocRef);
 
-                if (!userDocSnap.exists()) {
-                    showError(loginError, "Dados de usuário não encontrados.");
-                    await signOut(auth);
-                    return;
-                }
-
-                const userData = userDocSnap.data();
-
-                if (userData.status === 'pending') {
-                    showError(loginError, "Sua conta aguarda aprovação do administrador.");
+                if (!userDocSnap.exists() || userDocSnap.data().status === 'pending') {
+                    // Se o documento não existe ou o status ainda é pendente, o usuário não deve prosseguir.
+                    // A lógica de logout já terá sido tratada pelo formulário de login.
+                    // Se ele chegou aqui por um refresh de página, deslogamos.
+                    if (userDocSnap.data()?.status === 'pending') {
+                       showError(loginError, "Sua conta aguarda aprovação.");
+                    }
                     await signOut(auth);
                     return;
                 }
                 
+                const userData = userDocSnap.data();
+
+                // Esconde a tela de login e mostra o conteúdo de admin
                 authContainer.classList.add('hidden');
                 adminContent.classList.remove('hidden');
                 userEmailSpan.textContent = user.email;
                 userInfoContainer.classList.remove('hidden');
                 document.getElementById('unidade').value = userData.unidade;
-                document.getElementById('unidade').readOnly = true; // Trava o campo da unidade
+                document.getElementById('unidade').readOnly = true;
                 
                 comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
                 loadComunicados(userData.unidade);
@@ -283,6 +276,7 @@
                     loadPendingUsers();
                 }
             } else {
+                // Limpa a tela e mostra o formulário de login
                 if (unsubscribeComunicados) unsubscribeComunicados();
                 if (unsubscribePendingUsers) unsubscribePendingUsers();
                 authContainer.classList.remove('hidden');
@@ -292,36 +286,31 @@
                 comunicadosStatusMsg.textContent = 'Aguardando login...';
                 comunicadosStatusMsg.style.display = 'block';
                 document.getElementById('comunicados-list').innerHTML = '';
-                clearError(loginError);
+                // Não limpe o loginError aqui para que as mensagens de status pendente persistam
             }
         });
 
         registerForm.addEventListener('submit', async (e) => {
+            // ... (função de registro sem alterações)
             e.preventDefault();
             const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
             const email = registerForm['register-email'].value;
             const password = registerForm['register-password'].value;
-            
             clearError(registerError);
             registerError.style.color = 'var(--cor-erro)';
-
             if (!unidade || password.length < 6) {
                 showError(registerError, "Verifique os campos e a senha (mínimo 6 caracteres).");
                 return;
             }
-
             const registerButton = registerForm.querySelector('button[type="submit"]');
-
             try {
                 registerButton.disabled = true;
                 registerButton.textContent = 'Cadastrando...';
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                
-                setDoc(doc(db, "users", user.uid), {
+                await setDoc(doc(db, "users", user.uid), {
                     unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                 });
-                
                 registerForm.reset();
                 registerError.style.color = 'var(--cor-sucesso)';
                 showError(registerError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
@@ -337,83 +326,98 @@
             }
         });
 
+        // ### FUNÇÃO DE LOGIN CORRIGIDA ###
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = loginForm['login-email'].value;
             const password = loginForm['login-password'].value;
             clearError(loginError);
-            try { 
-                await signInWithEmailAndPassword(auth, email, password); 
-                loginForm.reset(); 
-            } catch (error) { 
-                showError(loginError, 'E-mail ou senha inválidos.'); 
+            const loginButton = loginForm.querySelector('button[type="submit"]');
+
+            try {
+                loginButton.disabled = true;
+                loginButton.textContent = 'Entrando...';
+
+                // 1. Tenta autenticar o usuário
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // 2. Após autenticar, busca o documento do usuário no Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+
+                // 3. Verifica se o documento existe e se o status é 'approved'
+                if (!userDocSnap.exists()) {
+                    throw new Error("db/user-not-found");
+                }
+
+                const userData = userDocSnap.data();
+                if (userData.status === 'pending') {
+                    throw new Error("auth/pending-approval");
+                }
+
+                // 4. Se tudo estiver certo, o onAuthStateChanged vai cuidar de mostrar a tela.
+                loginForm.reset();
+
+            } catch (error) {
+                // Se algum dos passos acima falhar, desloga o usuário por segurança
+                await signOut(auth);
+
+                // Mostra a mensagem de erro apropriada
+                if (error.message === "auth/pending-approval") {
+                    showError(loginError, "Sua conta aguarda aprovação do administrador.");
+                } else if (error.message === "db/user-not-found") {
+                    showError(loginError, "Dados de usuário não encontrados. Contate o suporte.");
+                } else if (error.code && (error.code.includes('auth/wrong-password') || error.code.includes('auth/user-not-found') || error.code.includes('auth/invalid-credential'))) {
+                    showError(loginError, 'E-mail ou senha inválidos.');
+                } else {
+                    showError(loginError, 'Ocorreu um erro ao tentar fazer login.');
+                    console.error("Login error:", error);
+                }
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = 'Entrar';
             }
         });
 
-        // ### CÓDIGO ADICIONADO PARA O FORMULÁRIO DE COMUNICADOS ###
         addComunicadoForm.addEventListener('submit', async (e) => {
+            // ... (função de adicionar comunicado sem alterações)
             e.preventDefault();
             clearError(formError);
             const submitButton = document.getElementById('submit-button');
-
             const newComunicado = {
                 unidade: document.getElementById('unidade').value.trim().toUpperCase(),
                 titulo: document.getElementById('titulo').value.trim(),
                 type: document.getElementById('type').value,
                 duracao: Number(document.getElementById('duracao').value),
-                createdAt: serverTimestamp() // Usa o timestamp do servidor
+                createdAt: serverTimestamp()
             };
-            
-            // Validação básica
             if (!newComunicado.unidade || !newComunicado.titulo) {
                 return showError(formError, "Unidade e Título são obrigatórios.");
             }
-
             submitButton.disabled = true;
             submitButton.textContent = 'Adicionando...';
-
             try {
-                // Lógica para tipo Iframe
                 if (newComunicado.type === 'iframe') {
                     newComunicado.url = document.getElementById('url').value.trim();
-                    if (!newComunicado.url) {
-                        throw new Error("URL é obrigatória para o tipo Página Web.");
-                    }
-                } 
-                // Lógica para tipo Texto/Imagem
-                else {
+                    if (!newComunicado.url) throw new Error("URL é obrigatória para o tipo Página Web.");
+                } else {
                     newComunicado.texto = document.getElementById('texto').value.trim();
                     newComunicado.imageOnly = document.getElementById('imageOnly').checked;
                     const imageFile = document.getElementById('imageUpload').files[0];
-
-                    if (newComunicado.imageOnly && !imageFile) {
-                        throw new Error("Uma imagem é obrigatória para o tipo 'Apenas imagem'.");
-                    }
-                    if (!newComunicado.imageOnly && !newComunicado.texto && !imageFile) {
-                         throw new Error("É necessário fornecer um texto ou uma imagem.");
-                    }
-                    
-                    // Se houver imagem, faz o upload
+                    if (newComunicado.imageOnly && !imageFile) throw new Error("Uma imagem é obrigatória para o tipo 'Apenas imagem'.");
+                    if (!newComunicado.imageOnly && !newComunicado.texto && !imageFile) throw new Error("É necessário fornecer um texto ou uma imagem.");
                     if (imageFile) {
                         const storageRef = ref(storage, `comunicados/${Date.now()}_${imageFile.name}`);
                         const uploadTask = uploadBytesResumable(storageRef, imageFile);
-                        
-                        await uploadTask; // Espera o upload completar
-                        
+                        await uploadTask;
                         newComunicado.imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
                     }
                 }
-                
-                // Adiciona o documento ao Firestore
                 await addDoc(comunicadosCollection, newComunicado);
-                
                 addComunicadoForm.reset();
-                // Simples feedback de sucesso
                 submitButton.textContent = 'Adicionado com Sucesso!';
-                setTimeout(() => {
-                    submitButton.textContent = 'Adicionar Comunicado';
-                }, 2000);
-
+                setTimeout(() => { submitButton.textContent = 'Adicionar Comunicado'; }, 2000);
             } catch (error) {
                 console.error("Erro ao adicionar comunicado:", error);
                 showError(formError, `Erro: ${error.message}`);
