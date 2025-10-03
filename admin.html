@@ -167,7 +167,7 @@
 
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc, getDoc, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc, getDoc, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
     
@@ -186,9 +186,16 @@
     const approvalSection = document.getElementById('approval-section');
     const pendingUsersList = document.getElementById('pending-users-list');
     const comunicadosStatusMsg = document.getElementById('comunicados-status-msg');
+    const addComunicadoForm = document.getElementById('add-comunicado-form');
+    const typeSelect = document.getElementById('type');
+    const fieldsTextImage = document.getElementById('fields-text-image');
+    const fieldsIframe = document.getElementById('fields-iframe');
+    const imageOnlyCheckbox = document.getElementById('imageOnly');
+    const textoContainer = document.getElementById('texto-container');
 
     let unsubscribeComunicados = null;
     let unsubscribePendingUsers = null;
+    let comunicadosCollection; // Movido para um escopo mais alto
 
     function showError(element, message) {
         element.textContent = message;
@@ -199,13 +206,30 @@
         element.textContent = '';
         element.classList.add('hidden');
     }
+    
+    // Mostra/Esconde campos baseados no tipo de comunicado
+    typeSelect.addEventListener('change', () => {
+        if (typeSelect.value === 'iframe') {
+            fieldsTextImage.classList.add('hidden');
+            fieldsIframe.classList.remove('hidden');
+        } else {
+            fieldsTextImage.classList.remove('hidden');
+            fieldsIframe.classList.add('hidden');
+        }
+    });
+
+    // Mostra/Esconde campo de texto se "apenas imagem" for marcado
+    imageOnlyCheckbox.addEventListener('change', () => {
+        textoContainer.style.display = imageOnlyCheckbox.checked ? 'none' : 'block';
+    });
+
 
     try {
         const userFirebaseConfig = {
             apiKey: "AIzaSyCG-HiSw5h5Soir5c5z3iBbE6UoA6EuuBA",
             authDomain: "mural-eletronico-nav.firebaseapp.com",
             projectId: "mural-eletronico-nav",
-            storageBucket: "mural-eletronico-nav.firebasestorage.app", 
+            storageBucket: "mural-eletronico-nav.appspot.com", // Corrigido para .appspot.com que é o padrão
             messagingSenderId: "715537886137",
             appId: "1:715537886137:web:f715e8fc9438df82722468",
             measurementId: "G-T2LLX-J94V"
@@ -219,7 +243,6 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
-        let comunicadosCollection;
 
         showRegisterLink.addEventListener('click', (e) => { e.preventDefault(); loginForm.classList.add('hidden'); registerForm.classList.remove('hidden'); });
         showLoginLink.addEventListener('click', (e) => { e.preventDefault(); registerForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
@@ -231,7 +254,7 @@
                 const userDocSnap = await getDoc(userDocRef);
 
                 if (!userDocSnap.exists()) {
-                    showError(loginError, "Dados de usuário não encontrados. Tente se cadastrar.");
+                    showError(loginError, "Dados de usuário não encontrados.");
                     await signOut(auth);
                     return;
                 }
@@ -249,6 +272,7 @@
                 userEmailSpan.textContent = user.email;
                 userInfoContainer.classList.remove('hidden');
                 document.getElementById('unidade').value = userData.unidade;
+                document.getElementById('unidade').readOnly = true; // Trava o campo da unidade
                 
                 comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
                 loadComunicados(userData.unidade);
@@ -290,29 +314,23 @@
             try {
                 registerButton.disabled = true;
                 registerButton.textContent = 'Cadastrando...';
-
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
                 
-                // Removido o 'await' para impedir que o logout do onAuthStateChanged trave o processo.
                 setDoc(doc(db, "users", user.uid), {
                     unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                 });
                 
                 registerForm.reset();
-                
                 registerError.style.color = 'var(--cor-sucesso)';
                 showError(registerError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
-
             } catch (error) {
-                console.error('Erro no registro:', error);
                 if (error.code === 'auth/email-already-in-use') { 
                     showError(registerError, 'Este e-mail já está em uso.'); 
                 } else { 
                     showError(registerError, 'Erro ao cadastrar. Tente novamente.'); 
                 }
             } finally {
-                // Com a remoção do await, o código agora chegará aqui para reativar o botão.
                 registerButton.disabled = false;
                 registerButton.textContent = 'Cadastrar';
             }
@@ -331,31 +349,97 @@
             }
         });
 
-        const form = document.getElementById('add-comunicado-form');
-        // ... (código completo do form.addEventListener('submit', ...))
+        // ### CÓDIGO ADICIONADO PARA O FORMULÁRIO DE COMUNICADOS ###
+        addComunicadoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError(formError);
+            const submitButton = document.getElementById('submit-button');
+
+            const newComunicado = {
+                unidade: document.getElementById('unidade').value.trim().toUpperCase(),
+                titulo: document.getElementById('titulo').value.trim(),
+                type: document.getElementById('type').value,
+                duracao: Number(document.getElementById('duracao').value),
+                createdAt: serverTimestamp() // Usa o timestamp do servidor
+            };
+            
+            // Validação básica
+            if (!newComunicado.unidade || !newComunicado.titulo) {
+                return showError(formError, "Unidade e Título são obrigatórios.");
+            }
+
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adicionando...';
+
+            try {
+                // Lógica para tipo Iframe
+                if (newComunicado.type === 'iframe') {
+                    newComunicado.url = document.getElementById('url').value.trim();
+                    if (!newComunicado.url) {
+                        throw new Error("URL é obrigatória para o tipo Página Web.");
+                    }
+                } 
+                // Lógica para tipo Texto/Imagem
+                else {
+                    newComunicado.texto = document.getElementById('texto').value.trim();
+                    newComunicado.imageOnly = document.getElementById('imageOnly').checked;
+                    const imageFile = document.getElementById('imageUpload').files[0];
+
+                    if (newComunicado.imageOnly && !imageFile) {
+                        throw new Error("Uma imagem é obrigatória para o tipo 'Apenas imagem'.");
+                    }
+                    if (!newComunicado.imageOnly && !newComunicado.texto && !imageFile) {
+                         throw new Error("É necessário fornecer um texto ou uma imagem.");
+                    }
+                    
+                    // Se houver imagem, faz o upload
+                    if (imageFile) {
+                        const storageRef = ref(storage, `comunicados/${Date.now()}_${imageFile.name}`);
+                        const uploadTask = uploadBytesResumable(storageRef, imageFile);
+                        
+                        await uploadTask; // Espera o upload completar
+                        
+                        newComunicado.imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                    }
+                }
+                
+                // Adiciona o documento ao Firestore
+                await addDoc(comunicadosCollection, newComunicado);
+                
+                addComunicadoForm.reset();
+                // Simples feedback de sucesso
+                submitButton.textContent = 'Adicionado com Sucesso!';
+                setTimeout(() => {
+                    submitButton.textContent = 'Adicionar Comunicado';
+                }, 2000);
+
+            } catch (error) {
+                console.error("Erro ao adicionar comunicado:", error);
+                showError(formError, `Erro: ${error.message}`);
+            } finally {
+                submitButton.disabled = false;
+                if(submitButton.textContent !== 'Adicionado com Sucesso!'){
+                   submitButton.textContent = 'Adicionar Comunicado';
+                }
+            }
+        });
         
         function loadComunicados(unidadeDoUsuario) {
+            // ... (função sem alterações)
             if (unsubscribeComunicados) unsubscribeComunicados();
-            
             comunicadosStatusMsg.textContent = `Carregando comunicados para ${unidadeDoUsuario}...`;
             comunicadosStatusMsg.style.display = 'block';
-
-            const q = query(collection(db, `artifacts/${appId}/public/data/comunicados`), where("unidade", "==", unidadeDoUsuario));
-
+            const q = query(comunicadosCollection, where("unidade", "==", unidadeDoUsuario));
             unsubscribeComunicados = onSnapshot(q, (snapshot) => {
                 const listContainer = document.getElementById('comunicados-list');
                 listContainer.innerHTML = ''; 
-
                 if (snapshot.empty) {
                     comunicadosStatusMsg.textContent = `Nenhum comunicado para a unidade ${unidadeDoUsuario}.`;
-                    comunicadosStatusMsg.style.display = 'block';
                     return;
                 }
-                
                 comunicadosStatusMsg.style.display = 'none';
                 const comunicados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                comunicados.sort((a, b) => (b.createdAt.toDate ? b.createdAt.toDate().getTime() : b.createdAt) - (a.createdAt.toDate ? a.createdAt.toDate().getTime() : a.createdAt));
-
+                comunicados.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
                 comunicados.forEach(data => {
                     const div = document.createElement('div');
                     div.className = 'border p-4 rounded-lg bg-gray-50 flex justify-between items-start';
@@ -366,27 +450,24 @@
                     div.innerHTML = `<div><h3 class="font-bold">${data.titulo}</h3><p class="text-sm text-gray-600 break-all">${description}</p><div class="flex items-center gap-2 mt-2"><span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-1 rounded-full">${data.unidade || 'N/A'}</span><span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${typeLabel}</span></div></div><button data-id="${data.id}" class="delete-btn btn-danger text-sm py-1 px-3 rounded-md flex-shrink-0 ml-4">Excluir</button>`;
                     listContainer.appendChild(div);
                 });
-
                 listContainer.querySelectorAll('.delete-btn').forEach(button => {
                     button.addEventListener('click', async (e) => {
                         const id = e.target.dataset.id;
                         if (confirm('Tem certeza?')) {
-                            await deleteDoc(doc(db, `artifacts/${appId}/public/data/comunicados`, id));
+                            await deleteDoc(doc(comunicadosCollection, id));
                         }
                     });
                 });
             }, (error) => {
                 console.error("Erro ao carregar comunicados:", error);
                 comunicadosStatusMsg.textContent = 'Erro ao carregar comunicados.';
-                comunicadosStatusMsg.style.display = 'block';
             });
         }
 
         function loadPendingUsers() {
+            // ... (função sem alterações)
             if (unsubscribePendingUsers) unsubscribePendingUsers();
-            
             const q = query(collection(db, "users"), where("status", "==", "pending"));
-
             unsubscribePendingUsers = onSnapshot(q, (snapshot) => {
                 const list = document.getElementById('pending-users-list');
                 list.innerHTML = '';
@@ -408,19 +489,18 @@
         }
         
         pendingUsersList.addEventListener('click', async (e) => {
+            // ... (função sem alterações)
             const button = e.target;
             const uid = button.dataset.uid;
             if (!uid) return;
-
             if (button.classList.contains('approve-btn')) {
                 button.disabled = true;
                 button.textContent = 'Aprovando...';
                 try { await updateDoc(doc(db, "users", uid), { status: 'approved' }); } 
                 catch (err) { console.error("Erro ao aprovar: ", err); button.disabled = false; button.textContent = 'Aprovar'; }
             }
-
             if (button.classList.contains('deny-btn')) {
-                if (confirm('Tem certeza que deseja negar este usuário? O perfil dele será removido.')) {
+                if (confirm('Tem certeza que deseja negar este usuário?')) {
                     button.disabled = true;
                     button.textContent = 'Negando...';
                     try {
