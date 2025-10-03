@@ -287,9 +287,12 @@
                         unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                     });
                     
-                    registerForm.reset();
-                    alert("Cadastro realizado com sucesso! Sua conta agora está pendente de aprovação por um administrador.");
-                    showLoginLink.click();
+                   registerForm.reset();
+
+// ALTERAÇÃO: Substituímos a mensagem de texto por um alert mais claro.
+alert("Cadastro realizado com sucesso! Sua conta agora está pendente de aprovação por um administrador.");
+
+showLoginLink.click();
                     
                 } catch (error) {
                     // ALTERAÇÃO: Adicionado console.error para nos mostrar o erro exato
