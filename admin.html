@@ -276,14 +276,18 @@
                 const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
                 const email = registerForm['register-email'].value;
                 const password = registerForm['register-password'].value;
+                
+                // Limpa mensagens de erro/sucesso anteriores
                 clearError(registerError);
+                registerError.style.color = 'var(--cor-erro)';
+
                 if (!unidade) { showError(registerError, "O campo 'Sua Unidade' é obrigatório."); return; }
                 if (password.length < 6) { showError(registerError, "A senha deve ter no mínimo 6 caracteres."); return; }
 
                 const registerButton = registerForm.querySelector('button[type="submit"]');
 
                 try {
-                    // Disable button to prevent multiple submissions
+                    // Desabilita o botão para previnir múltiplos envios
                     registerButton.disabled = true;
                     registerButton.textContent = 'Cadastrando...';
 
@@ -293,37 +297,26 @@
                         unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                     });
                     
+                    // Limpa o formulário após o sucesso
                     registerForm.reset();
                     
-                    // Switch to the login form to show the success message there
-                    showLoginLink.click();
-
-                    // Change login message element to show success
-                    loginError.style.color = 'var(--cor-sucesso)';
-                    showError(loginError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
-                    
-                    // Wait for a couple of seconds so the user can read the message
-                    await new Promise(r => setTimeout(r, 2500));
-
-                    // Revert the color and hide the message. The onAuthStateChanged handler will
-                    // also run and might clear this, but it's good practice to manage state.
-                    loginError.style.color = 'var(--cor-erro)';
-                    clearError(loginError);
+                    // Mostra a mensagem de sucesso no próprio formulário de cadastro
+                    registerError.style.color = 'var(--cor-sucesso)';
+                    showError(registerError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
 
                 } catch (error) {
                     if (error.code === 'auth/email-already-in-use') { 
                         showError(registerError, 'Este e-mail já está em uso.'); 
                     } else { 
-                        showError(registerError, 'Erro ao cadastrar.'); 
+                        showError(registerError, 'Erro ao cadastrar. Tente novamente.'); 
                         console.error("Register error:", error); 
                     }
                 } finally {
-                    // Re-enable button in case of success or error
+                    // Reabilita o botão em todos os casos (sucesso ou erro)
                     registerButton.disabled = false;
                     registerButton.textContent = 'Cadastrar';
                 }
             });
-
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const email = loginForm['login-email'].value;
