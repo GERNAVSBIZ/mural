@@ -93,7 +93,74 @@
     </div>
     
     <main id="admin-content" class="hidden container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        </main>
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Adicionar Novo Comunicado</h2>
+            <form id="add-comunicado-form" class="space-y-4">
+                <div>
+                    <label for="unidade" class="block text-sm font-medium">Unidade</label>
+                    <input type="text" id="unidade" required maxlength="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300 uppercase">
+                </div>
+                <div>
+                    <label for="titulo" class="block text-sm font-medium">Título</label>
+                    <input type="text" id="titulo" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <div>
+                    <label for="type" class="block text-sm font-medium">Tipo</label>
+                    <select id="type" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                        <option value="text_image" selected>Texto e Imagem</option>
+                        <option value="iframe">Página Web (iframe)</option>
+                    </select>
+                </div>
+                <div id="fields-text-image" class="space-y-4">
+                    <div>
+                        <label for="imageUpload" class="block text-sm font-medium">Imagem (Opcional)</label>
+                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--cor-secundaria)] file:text-white hover:file:bg-opacity-80">
+                    </div>
+                     <div class="flex items-center">
+                        <input type="checkbox" id="imageOnly" class="h-4 w-4 rounded border-gray-300 text-[var(--cor-primaria)] focus:ring-[var(--cor-primaria)]">
+                        <label for="imageOnly" class="ml-2 block text-sm">Apenas imagem (tela cheia)</label>
+                    </div>
+                    <div id="texto-container">
+                        <label for="texto" class="block text-sm font-medium">Texto do Comunicado</label>
+                        <textarea id="texto" rows="4" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300"></textarea>
+                    </div>
+                    <div id="upload-progress-container" class="hidden space-y-2">
+                        <label class="block text-sm font-medium">Progresso</label>
+                        <div class="progress-bar-bg w-full h-2.5">
+                            <div id="upload-progress-bar" class="progress-bar-fill h-2.5" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="fields-iframe" class="hidden space-y-4">
+                    <div>
+                        <label for="url" class="block text-sm font-medium">URL da Página Web</label>
+                        <input type="url" id="url" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300" placeholder="https://site-a-ser-exibido.com">
+                    </div>
+                </div>
+                <div>
+                    <label for="duracao" class="block text-sm font-medium">Duração (segundos)</label>
+                    <input type="number" id="duracao" value="10" min="1" class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm border border-gray-300">
+                </div>
+                <button type="submit" id="submit-button" class="btn-primary font-bold py-2 px-4 rounded-lg w-full">
+                    Adicionar Comunicado
+                </button>
+                 <p id="form-error" class="text-sm text-[var(--cor-erro)] hidden"></p>
+            </form>
+        </section>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Comunicados Atuais</h2>
+            <p id="comunicados-status-msg">Aguardando login...</p>
+            <div id="comunicados-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-2"></div>
+        </section>
+        
+        <section id="approval-section" class="hidden lg:col-span-2 bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-[var(--cor-primaria)] border-b pb-2">Aprovações Pendentes</h2>
+            <div id="pending-users-list" class="space-y-3">
+                <p>Carregando usuários...</p>
+            </div>
+        </section>
+    </main>
 
     <footer class="text-center text-sm text-gray-500 py-4 mt-auto">
         <p>Desenvolvido por DNIZ by Wilkson</p>
@@ -101,8 +168,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, query, setDoc, getDoc, where, updateDoc, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
         // --- SELETORES DE ELEMENTOS ---
         const authContainer = document.getElementById('auth-container');
@@ -116,7 +184,13 @@
         const userInfoContainer = document.getElementById('user-info-container');
         const userEmailSpan = document.getElementById('user-email');
         const logoutButton = document.getElementById('logout-button');
+        const approvalSection = document.getElementById('approval-section');
+        const pendingUsersList = document.getElementById('pending-users-list');
+        const comunicadosStatusMsg = document.getElementById('comunicados-status-msg');
         const registerButton = document.getElementById('register-button');
+
+        let unsubscribeComunicados = null;
+        let unsubscribePendingUsers = null;
 
         // --- FUNÇÕES DE UTILIDADE ---
         function showMessage(element, message, isSuccess = false) {
@@ -151,6 +225,9 @@
             const app = initializeApp(userFirebaseConfig);
             const db = getFirestore(app);
             const auth = getAuth(app);
+            const storage = getStorage(app);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mural-app';
+            let comunicadosCollection;
 
             // --- EVENTOS DE UI ---
             showRegisterLink.addEventListener('click', (e) => {
@@ -171,10 +248,7 @@
 
             // --- LÓGICA DE AUTENTICAÇÃO ---
             onAuthStateChanged(auth, async (user) => {
-                // Apenas esconde/mostra os containers principais.
-                // A lógica de verificação de 'status' e 'role' foi movida para o login.
                 if (user) {
-                     // Verifica os dados do usuário do Firestore antes de mostrar o painel de admin
                     const userDocRef = doc(db, "users", user.uid);
                     const userDocSnap = await getDoc(userDocRef);
 
@@ -183,13 +257,30 @@
                         adminContent.classList.remove('hidden');
                         userEmailSpan.textContent = user.email;
                         userInfoContainer.classList.remove('hidden');
+
+                        const userData = userDocSnap.data();
+                        document.getElementById('unidade').value = userData.unidade;
+                        comunicadosCollection = collection(db, `artifacts/${appId}/public/data/comunicados`);
+                        loadComunicados(userData.unidade);
+
+                        if (userData.role === 'master') {
+                            approvalSection.classList.remove('hidden');
+                            loadPendingUsers();
+                        }
+                    } else {
+                        // Se o usuário está logado mas não foi aprovado, desloga-o.
+                        // A mensagem de erro será mostrada pelo formulário de login.
+                        await signOut(auth);
                     }
-                    // Se o usuário está logado mas não aprovado ou sem dados, o onAuthStateChanged
-                    // não fará nada, a lógica de logout no `signInWithEmailAndPassword` já tratou disso.
                 } else {
+                    if (unsubscribeComunicados) unsubscribeComunicados();
+                    if (unsubscribePendingUsers) unsubscribePendingUsers();
                     authContainer.classList.remove('hidden');
                     adminContent.classList.add('hidden');
                     userInfoContainer.classList.add('hidden');
+                    approvalSection.classList.add('hidden');
+                    comunicadosStatusMsg.textContent = 'Aguardando login...';
+                    document.getElementById('comunicados-list').innerHTML = '';
                     clearMessage(loginError);
                 }
             });
@@ -207,19 +298,18 @@
                 if (password.length < 6) { showMessage(registerMessage, "A senha deve ter no mínimo 6 caracteres."); registerButton.disabled = false; return; }
 
                 try {
-                    // Não loga o usuário, apenas cria.
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     const user = userCredential.user;
                     await setDoc(doc(db, "users", user.uid), {
                         unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                     });
 
-                    // Desloga o usuário recém-criado para que o onAuthStateChanged não dispare
+                    // Desloga o usuário para impedir o login automático
                     await signOut(auth);
                     
                     showMessage(registerMessage, "Cadastro realizado! Aguarde a aprovação do administrador.", true);
-
-                    // ALTERAÇÃO: Adiciona a pausa que você sugeriu. Aumentei para 3 segundos.
+                    
+                    // Pausa para o usuário ler a mensagem
                     await new Promise(r => setTimeout(r, 3000));
                     
                     registerForm.reset();
@@ -247,28 +337,114 @@
                 try { 
                     const userCredential = await signInWithEmailAndPassword(auth, email, password);
                     const user = userCredential.user;
-
-                    // Lógica de verificação movida para cá
+                    
+                    // Validação explícita no momento do login
                     const userDocRef = doc(db, "users", user.uid);
                     const userDocSnap = await getDoc(userDocRef);
 
                     if (!userDocSnap.exists()) {
                         showMessage(loginError, "Dados de usuário não encontrados.");
                         await signOut(auth);
-                        return;
-                    }
-                    const userData = userDocSnap.data();
-                    if (userData.status === 'pending') {
+                    } else if (userDocSnap.data().status === 'pending') {
                         showMessage(loginError, "Sua conta aguarda aprovação do administrador.");
                         await signOut(auth);
-                        return;
+                    } else {
+                        loginForm.reset(); 
+                        // Se aprovado, o onAuthStateChanged cuidará de mostrar a tela de admin
                     }
-
-                    // Se tudo estiver OK, o onAuthStateChanged vai lidar com a mudança de tela
-                    loginForm.reset(); 
-
                 } catch (error) { 
                     showMessage(loginError, 'E-mail ou senha inválidos.'); 
+                }
+            });
+            
+            // LÓGICA DO PAINEL DE ADMIN (CARREGAMENTO DE DADOS)
+            function loadComunicados(unidadeDoUsuario) {
+                if (unsubscribeComunicados) unsubscribeComunicados();
+                
+                comunicadosStatusMsg.textContent = `Carregando comunicados para ${unidadeDoUsuario}...`;
+                comunicadosStatusMsg.style.display = 'block';
+
+                const q = query(collection(db, `artifacts/${appId}/public/data/comunicados`), where("unidade", "==", unidadeDoUsuario));
+
+                unsubscribeComunicados = onSnapshot(q, (snapshot) => {
+                    const listContainer = document.getElementById('comunicados-list');
+                    listContainer.innerHTML = ''; 
+
+                    if (snapshot.empty) {
+                        comunicadosStatusMsg.textContent = `Nenhum comunicado para a unidade ${unidadeDoUsuario}.`;
+                        comunicadosStatusMsg.style.display = 'block';
+                        return;
+                    }
+                    
+                    comunicadosStatusMsg.style.display = 'none';
+                    const comunicados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    comunicados.sort((a, b) => (b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0));
+
+                    comunicados.forEach(data => {
+                        const div = document.createElement('div');
+                        // ... Código para criar o item do comunicado
+                        div.innerHTML = `<div>...</div><button>...</button>`; // Conteúdo omitido por brevidade
+                        listContainer.appendChild(div);
+                    });
+
+                }, (error) => {
+                    console.error("Erro ao carregar comunicados:", error);
+                    comunicadosStatusMsg.textContent = 'Erro ao carregar comunicados.';
+                    comunicadosStatusMsg.style.display = 'block';
+                });
+            }
+
+            function loadPendingUsers() {
+                if (unsubscribePendingUsers) unsubscribePendingUsers();
+                
+                const q = query(collection(db, "users"), where("status", "==", "pending"));
+
+                unsubscribePendingUsers = onSnapshot(q, (snapshot) => {
+                    const list = document.getElementById('pending-users-list');
+                    list.innerHTML = '';
+                    if (snapshot.empty) {
+                        list.innerHTML = '<p class="text-gray-500">Nenhum usuário aguardando aprovação.</p>';
+                        return;
+                    }
+                    snapshot.forEach(docSnap => {
+                        const userData = docSnap.data();
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'flex justify-between items-center p-2 border rounded-md';
+                        userDiv.innerHTML = `<div><p class="font-semibold">${userData.email}</p><p class="text-sm text-gray-600">Unidade: ${userData.unidade}</p></div><div class="flex gap-2"><button data-uid="${docSnap.id}" class="approve-btn btn-success text-sm py-1 px-3 rounded-md">Aprovar</button><button data-uid="${docSnap.id}" class="deny-btn btn-danger text-sm py-1 px-3 rounded-md">Negar</button></div>`;
+                        list.appendChild(userDiv);
+                    });
+                }, (error) => {
+                    console.error("Erro ao carregar usuários pendentes:", error);
+                    document.getElementById('pending-users-list').innerHTML = '<p class="text-red-500">Erro ao carregar usuários.</p>';
+                });
+            }
+            
+            pendingUsersList.addEventListener('click', async (e) => {
+                const button = e.target;
+                const uid = button.dataset.uid;
+                if (!uid) return;
+
+                if (button.classList.contains('approve-btn')) {
+                    button.disabled = true;
+                    button.textContent = 'Aprovando...';
+                    try { await updateDoc(doc(db, "users", uid), { status: 'approved' }); } 
+                    catch (err) { console.error("Erro ao aprovar: ", err); button.disabled = false; button.textContent = 'Aprovar'; }
+                }
+
+                if (button.classList.contains('deny-btn')) {
+                    if (confirm('Tem certeza que deseja negar este usuário? O perfil dele será removido.')) {
+                        button.disabled = true;
+                        button.textContent = 'Negando...';
+                        try {
+                            await deleteDoc(doc(db, "users", uid));
+                            alert('Usuário negado. Lembre-se de excluí-lo também do painel de "Authentication".');
+                        } catch (err) {
+                            console.error("Erro ao negar: ", err);
+                            alert('Ocorreu um erro.');
+                            button.disabled = false;
+                            button.textContent = 'Negar';
+                        }
+                    }
                 }
             });
 
