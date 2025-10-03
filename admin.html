@@ -171,7 +171,6 @@
     import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
     
-    // ... (todas as suas constantes 'const' permanecem as mesmas)
     const authContainer = document.getElementById('auth-container');
     const adminContent = document.getElementById('admin-content');
     const loginForm = document.getElementById('login-form');
@@ -227,30 +226,24 @@
         logoutButton.addEventListener('click', async () => { await signOut(auth); });
 
         onAuthStateChanged(auth, async (user) => {
-            console.log('[AUTH_STATE_CHANGED] - Listener disparado. Usuário:', user ? user.email : 'Nenhum');
             if (user) {
                 const userDocRef = doc(db, "users", user.uid);
                 const userDocSnap = await getDoc(userDocRef);
 
                 if (!userDocSnap.exists()) {
-                    console.warn('[AUTH_STATE_CHANGED] - Usuário existe no Auth, mas não no Firestore. Deslogando.');
                     showError(loginError, "Dados de usuário não encontrados. Tente se cadastrar.");
                     await signOut(auth);
                     return;
                 }
 
                 const userData = userDocSnap.data();
-                console.log('[AUTH_STATE_CHANGED] - Dados do usuário no Firestore:', userData);
 
                 if (userData.status === 'pending') {
-                    console.log('[AUTH_STATE_CHANGED] - Status do usuário é PENDENTE. Deslogando...');
                     showError(loginError, "Sua conta aguarda aprovação do administrador.");
                     await signOut(auth);
-                    console.log('[AUTH_STATE_CHANGED] - Deslogado com sucesso.');
                     return;
                 }
                 
-                console.log('[AUTH_STATE_CHANGED] - Usuário APROVADO. Configurando a interface.');
                 authContainer.classList.add('hidden');
                 adminContent.classList.remove('hidden');
                 userEmailSpan.textContent = user.email;
@@ -265,7 +258,6 @@
                     loadPendingUsers();
                 }
             } else {
-                console.log('[AUTH_STATE_CHANGED] - Nenhum usuário logado. Limpando a interface.');
                 if (unsubscribeComunicados) unsubscribeComunicados();
                 if (unsubscribePendingUsers) unsubscribePendingUsers();
                 authContainer.classList.remove('hidden');
@@ -281,8 +273,6 @@
 
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            console.log('[REGISTER_SUBMIT] - Formulário de registro enviado.');
-
             const unidade = registerForm['register-unidade'].value.trim().toUpperCase();
             const email = registerForm['register-email'].value;
             const password = registerForm['register-password'].value;
@@ -291,7 +281,6 @@
             registerError.style.color = 'var(--cor-erro)';
 
             if (!unidade || password.length < 6) {
-                console.error('[REGISTER_SUBMIT] - Falha na validação.');
                 showError(registerError, "Verifique os campos e a senha (mínimo 6 caracteres).");
                 return;
             }
@@ -299,42 +288,33 @@
             const registerButton = registerForm.querySelector('button[type="submit"]');
 
             try {
-                console.log('[REGISTER_SUBMIT] - Entrando no bloco TRY.');
                 registerButton.disabled = true;
                 registerButton.textContent = 'Cadastrando...';
-                console.log('[REGISTER_SUBMIT] - Botão desabilitado.');
 
-                console.log('[REGISTER_SUBMIT] - Chamando createUserWithEmailAndPassword...');
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                console.log('[REGISTER_SUBMIT] - createUserWithEmailAndPassword SUCESSO. Usuário criado:', userCredential.user.uid);
-                
                 const user = userCredential.user;
                 
-                console.log('[REGISTER_SUBMIT] - Chamando setDoc para salvar no Firestore...');
-                await setDoc(doc(db, "users", user.uid), {
+                // Removido o 'await' para impedir que o logout do onAuthStateChanged trave o processo.
+                setDoc(doc(db, "users", user.uid), {
                     unidade: unidade, email: user.email, status: 'pending', role: 'regular'
                 });
-                console.log('[REGISTER_SUBMIT] - setDoc SUCESSO.');
-
+                
                 registerForm.reset();
-                console.log('[REGISTER_SUBMIT] - Formulário resetado.');
                 
                 registerError.style.color = 'var(--cor-sucesso)';
                 showError(registerError, "Cadastro realizado! Aguarde a aprovação para fazer login.");
-                console.log('[REGISTER_SUBMIT] - Mensagem de sucesso exibida.');
 
             } catch (error) {
-                console.error('[REGISTER_SUBMIT] - ERRO NO BLOCO CATCH!', error);
+                console.error('Erro no registro:', error);
                 if (error.code === 'auth/email-already-in-use') { 
                     showError(registerError, 'Este e-mail já está em uso.'); 
                 } else { 
                     showError(registerError, 'Erro ao cadastrar. Tente novamente.'); 
                 }
             } finally {
-                console.log('[REGISTER_SUBMIT] - Entrando no bloco FINALLY.');
+                // Com a remoção do await, o código agora chegará aqui para reativar o botão.
                 registerButton.disabled = false;
                 registerButton.textContent = 'Cadastrar';
-                console.log('[REGISTER_SUBMIT] - Botão reabilitado.');
             }
         });
 
@@ -351,7 +331,6 @@
             }
         });
 
-        // ... (resto do seu código, como loadComunicados, loadPendingUsers, etc, permanece o mesmo)
         const form = document.getElementById('add-comunicado-form');
         // ... (código completo do form.addEventListener('submit', ...))
         
